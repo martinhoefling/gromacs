@@ -112,6 +112,7 @@ double do_md_openmm(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                     int repl_ex_nst,int repl_ex_seed,
                     real cpt_period,real max_hours,
                     const char *deviceOptions,
+                    int imdport, int imdfreq,
                     unsigned long Flags,
                     gmx_runtime_t *runtime)
 {
