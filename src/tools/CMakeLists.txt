@@ -5,7 +5,7 @@ add_library(gmxana
             eigio.c         cmat.c          
             eigensolver.c   nsc.c           
             hxprops.c       fitahx.c        
-            geminate.c
+            geminate.c      nsfactor.c
             gmx_analyze.c   gmx_anaeig.c    gmx_angle.c     gmx_bond.c      
             gmx_bundle.c    gmx_chi.c       gmx_cluster.c   gmx_confrms.c   
             gmx_covar.c     gmx_current.c   
@@ -19,7 +19,7 @@ add_library(gmxana
             gmx_nmens.c     gmx_order.c     gmx_principal.c 
             gmx_polystat.c  gmx_potential.c gmx_rama.c      
             gmx_rdf.c       gmx_rms.c       gmx_rmsf.c      
-            gmx_rotacf.c    gmx_saltbr.c    gmx_sas.c              
+            gmx_rotacf.c    gmx_saltbr.c    gmx_sas.c       gmx_sans.c
             gmx_select.c    gmx_rmsdist.c   gmx_rotmat.c
             gmx_sgangle.c   gmx_sorient.c   gmx_spol.c      gmx_tcaf.c      
             gmx_traj.c      gmx_velacc.c    gmx_helixorient.c 
@@ -55,7 +55,7 @@ set(GMX_TOOLS_PROGRAMS
     g_spol g_spatial g_tcaf g_traj g_tune_pme g_vanhove
     g_velacc g_clustsize g_mdmat g_wham g_sigeps g_bar
     g_membed g_pme_error g_rmsdist g_rotmat g_options
-    g_dos    g_hydorder  g_densorder g_dyecoupl
+    g_dos    g_hydorder  g_densorder g_dyecoupl g_sans
     )
 
 set(GMX_TOOLS_PROGRAMS_NOT_FOR_INSTALLATION
@@ -65,6 +65,9 @@ set(GMX_TOOLS_PROGRAMS_NOT_FOR_INSTALLATION
 
 foreach(TOOL ${GMX_TOOLS_PROGRAMS} ${GMX_TOOLS_PROGRAMS_NOT_FOR_INSTALLATION})
     add_executable(${TOOL} ${TOOL}.c)
+    if (NOT ${TOOL} STREQUAL "g_options")
+        gmx_add_man_page(${TOOL})
+    endif()
     target_link_libraries(${TOOL} gmxana)
     set_target_properties(${TOOL} PROPERTIES OUTPUT_NAME "${TOOL}${GMX_BINARY_SUFFIX}")
 endforeach(TOOL ${GMX_TOOLS_PROGRAMS}) 

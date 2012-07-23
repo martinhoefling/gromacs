@@ -35,6 +35,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include "gmx_header_config.h"
 
 #include <string.h>
 #include <math.h>
@@ -58,7 +59,6 @@
 #include "do_fit.h"
 #include "rmpbc.h"
 #include "wgms.h"
-#include "magic.h"
 #include "pbc.h"
 #include "viewit.h"
 #include "xvgr.h"
@@ -66,33 +66,6 @@
 #include "gmx_sort.h"
 
 enum { euSel,euRect, euTric, euCompact, euNR};
-
-
-static int 
-sort_comdist2(void *thunk, const void *a, const void *b)
-{
-    /* Thunk should point to a real array with the distance to the cluster COM for each molecule,
-     * a/b point to integers that refer to the molecule number. 
-     */
-    real *pcomdist2 = thunk;
-    int  ia    = * (int *)a;
-    int  ib    = * (int *)b;
-    int  rc;
-    
-    if(pcomdist2[ia]<pcomdist2[ib])
-    {
-        rc=-1;
-    }
-    else if (pcomdist2[ia]>pcomdist2[ib])
-    {
-        rc=1;
-    }
-    else
-    {
-        rc=0;
-    }
-    return rc;
-}
 
 
 static void calc_pbc_cluster(int ecenter,int nrefat,t_topology *top,int ePBC,
@@ -441,7 +414,7 @@ void check_trn(const char *fn)
         gmx_fatal(FARGS,"%s is not a trajectory file, exiting\n",fn);
 }
 
-#if (!defined WIN32 && !defined _WIN32 && !defined WIN64 && !defined _WIN64)
+#ifndef GMX_NATIVE_WINDOWS
 void do_trunc(const char *fn, real t0)
 {
     t_fileio     *in;
@@ -744,7 +717,7 @@ int gmx_trjconv(int argc,char *argv[])
                         { &bVels }, "Read and write velocities if possible" },
                     { "-force", FALSE, etBOOL,
                         { &bForce }, "Read and write forces if possible" },
-#if (!defined WIN32 && !defined _WIN32 && !defined WIN64 && !defined _WIN64)
+#ifndef GMX_NATIVE_WINDOWS
                     { "-trunc", FALSE, etTIME,
                         { &ttrunc }, 
                         "Truncate input trajectory file after this time (%t)" },
@@ -853,7 +826,7 @@ int gmx_trjconv(int argc,char *argv[])
     in_file=opt2fn("-f",NFILE,fnm);
 
     if (ttrunc != -1) {
-#if (!defined WIN32 && !defined _WIN32 && !defined WIN64 && !defined _WIN64)
+#ifndef GMX_NATIVE_WINDOWS
         do_trunc(in_file,ttrunc);
 #endif
     }
@@ -1201,7 +1174,7 @@ int gmx_trjconv(int argc,char *argv[])
                 if (bSubTraj) {
                     /*if (frame >= clust->clust->nra)
 	    gmx_fatal(FARGS,"There are more frames in the trajectory than in the cluster index file\n");*/
-                    if (frame >= clust->maxframe)
+                    if (frame > clust->maxframe)
                         my_clust = -1;
                     else
                         my_clust = clust->inv_clust[frame];
@@ -1553,6 +1526,8 @@ int gmx_trjconv(int argc,char *argv[])
         fprintf(stderr,"\n");
 
         close_trj(status);
+        sfree(outf_base);
+
 	if (bRmPBC)
 	  gmx_rmpbc_done(gpbc);
 	

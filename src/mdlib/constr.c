@@ -341,7 +341,7 @@ gmx_bool constrain(FILE *fplog,gmx_bool bLog,gmx_bool bEner,
         /* Set the constraint lengths for the step at which this configuration
          * is meant to be. The invmasses should not be changed.
          */
-        lambda += delta_step*ir->delta_lambda;
+        lambda += delta_step*ir->fepvals->delta_lambda;
     }
     
     if (vir != NULL)
@@ -406,7 +406,7 @@ gmx_bool constrain(FILE *fplog,gmx_bool bLog,gmx_bool bEner,
     settle  = &idef->il[F_SETTLE];
     if (settle->nr > 0)
     {
-        nsettle = settle->nr/2;
+        nsettle = settle->nr/4;
         
         switch (econq)
         {
@@ -431,7 +431,7 @@ gmx_bool constrain(FILE *fplog,gmx_bool bLog,gmx_bool bEner,
                 sprintf(buf,
                         "\nstep " gmx_large_int_pfmt ": Water molecule starting at atom %d can not be "
                         "settled.\nCheck for bad contacts and/or reduce the timestep if appropriate.\n",
-                        step,ddglatnr(cr->dd,settle->iatoms[error*2+1]));
+                        step,ddglatnr(cr->dd,settle->iatoms[error*4+1]));
                 if (fplog)
                 {
                     fprintf(fplog,"%s",buf);
@@ -773,8 +773,6 @@ void set_constraints(struct gmx_constr *constr,
                 constr->lagr_nalloc = over_alloc_dd(ncons);
                 srenew(constr->lagr,constr->lagr_nalloc);
             }
-
-            constr->shaked = shake_init();
         }
     }
 
@@ -782,7 +780,7 @@ void set_constraints(struct gmx_constr *constr,
     {
         settle = &idef->il[F_SETTLE];
         iO = settle->iatoms[1];
-        iH = settle->iatoms[1]+1;
+        iH = settle->iatoms[2];
         constr->settled =
             settle_init(md->massT[iO],md->massT[iH],
                         md->invmass[iO],md->invmass[iH],
@@ -913,12 +911,12 @@ static real constr_r_max_moltype(FILE *fplog,
       constr_recur(&at2con,molt->ilist,iparams,
 		   TRUE,at,0,1+ir->nProjOrder,path,r0,r1,&r2maxB,&count);
     }
-    lam0 = ir->init_lambda;
+    lam0 = ir->fepvals->init_lambda;
     if (EI_DYNAMICS(ir->eI))
-      lam0 += ir->init_step*ir->delta_lambda;
+      lam0 += ir->init_step*ir->fepvals->delta_lambda;
     rmax = (1 - lam0)*sqrt(r2maxA) + lam0*sqrt(r2maxB);
     if (EI_DYNAMICS(ir->eI)) {
-      lam1 = ir->init_lambda + (ir->init_step + ir->nsteps)*ir->delta_lambda;
+      lam1 = ir->fepvals->init_lambda + (ir->init_step + ir->nsteps)*ir->fepvals->delta_lambda;
       rmax = max(rmax,(1 - lam1)*sqrt(r2maxA) + lam1*sqrt(r2maxB));
     }
   }
@@ -1035,6 +1033,8 @@ gmx_constr_t init_constraints(FILE *fplog,
             {
                 please_cite(fplog,"Barth95a");
             }
+
+            constr->shaked = shake_init();
         }
     }
   
@@ -1046,7 +1046,7 @@ gmx_constr_t init_constraints(FILE *fplog,
         iloop = gmx_mtop_ilistloop_init(mtop);
         while (gmx_mtop_ilistloop_next(iloop,&ilist,&nmol)) 
         {
-            for (i=0; i<ilist[F_SETTLE].nr; i+=2) 
+            for (i=0; i<ilist[F_SETTLE].nr; i+=4) 
             {
                 if (settle_type == -1) 
                 {
@@ -1145,4 +1145,18 @@ gmx_bool inter_charge_group_constraints(gmx_mtop_t *mtop)
   }
 
   return bInterCG;
+}
+
+/* helper functions for andersen temperature control, because the
+ * gmx_constr construct is only defined in constr.c. Return the list
+ * of blocks (get_sblock) and the number of blocks (get_nblocks).  */
+
+extern int *get_sblock(struct gmx_constr *constr)
+{
+    return constr->sblock;
+}
+
+extern int get_nblocks(struct gmx_constr *constr)
+{
+    return constr->nblocks;
 }

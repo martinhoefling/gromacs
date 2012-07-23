@@ -36,6 +36,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include "gmx_header_config.h"
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
@@ -144,7 +145,7 @@ typedef struct sample_range_t
     foreign lambda) */
 typedef struct sample_coll_t
 {
-    double native_lambda;  /* these should be the same for all samples in the */
+    double native_lambda;  /* these should be the same for all samples in the histogram?*/
     double foreign_lambda; /* collection */
     double temp; /* the temperature */
 
@@ -251,25 +252,6 @@ static void samples_init(samples_t *s, double native_lambda,
 
     s->ntot=0;
     s->filename=filename;
-}
-
-/* destroy the data structures directly associated with the structure, not
-   the data it points to */
-static void samples_destroy(samples_t *s)
-{
-    if (s->du_alloc)
-    {
-        sfree(s->du_alloc);
-    }
-    if (s->t_alloc)
-    {
-        sfree(s->t_alloc);
-    }
-    if (s->hist_alloc)
-    {
-        hist_destroy(s->hist_alloc);
-        sfree(s->hist_alloc);
-    }
 }
 
 static void sample_range_init(sample_range_t *r, samples_t *s)
@@ -2049,7 +2031,7 @@ static void read_bar_xvg(char *fn, real *temp, lambda_t *lambda_head)
         gmx_fatal(FARGS,"File '%s' contains fewer than two columns", fn);
     }
 
-    if ( ( *temp != barsim->temp) && (*temp > 0) )
+    if ( !gmx_within_tol(*temp,barsim->temp,GMX_FLOAT_EPS) && (*temp > 0) )
     {
         gmx_fatal(FARGS,"Temperature in file %s different from earlier files or setting\n", fn);
     }
@@ -2135,9 +2117,9 @@ static void read_edr_rawdh_block(samples_t **smp, int *ndu, t_enxblock *blk,
     }
 
     /* make room for the data */
-    if (s->ndu_alloc < (s->ndu + blk->sub[2].nr) )
+    if (s->ndu_alloc < (size_t)(s->ndu + blk->sub[2].nr) )
     {
-        s->ndu_alloc += (s->ndu_alloc < blk->sub[2].nr) ?  
+        s->ndu_alloc += (s->ndu_alloc < (size_t)blk->sub[2].nr) ?  
                             blk->sub[2].nr*2 : s->ndu_alloc;
         srenew(s->du_alloc, s->ndu_alloc);
         s->du=s->du_alloc;
@@ -2690,14 +2672,13 @@ int gmx_bar(int argc,char *argv[])
         return 0;
     }
 
-#if 1
     if (sum_disc_err > prec)
     {
         prec=sum_disc_err;
         nd = ceil(-log10(prec));
         printf("WARNING: setting the precision to %g because that is the minimum\n         reasonable number, given the expected discretization error.\n", prec);
     }
-#endif
+
 
     sprintf(lamformat,"%%6.3f");
     sprintf( dgformat,"%%%d.%df",3+nd,nd);
@@ -2719,7 +2700,7 @@ int gmx_bar(int argc,char *argv[])
         fpb = xvgropen_type(opt2fn("-o",NFILE,fnm),"Free energy differences",
                             "\\lambda",buf,exvggtXYDY,oenv);
     }
-    
+
     fpi = NULL;
     if (opt2bSet("-oi",NFILE,fnm))
     {

@@ -36,7 +36,7 @@
 #include <config.h>
 #endif
 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include <thread_mpi.h>
 #endif
 
@@ -48,7 +48,7 @@
 #include "smalloc.h"
 #include "string2.h"
 #include "macros.h"
-#include "time.h"
+#include <time.h>
 #include "random.h"
 #include "statutil.h"
 #include "copyrite.h"
@@ -547,8 +547,22 @@ void please_cite(FILE *fp,const char *key)
       "M. Hoefling, N. Lima, D. Haenni, C.A.M. Seidel, B. Schuler, H. Grubmuller",
       "Structural Heterogeneity and Quantitative FRET Efficiency Distributions of Polyprolines through a Hybrid Atomistic Simulation and Monte Carlo Approach",
       "PLoS ONE",
-      6, 2011, "e19791"
-    }
+      6, 2011, "e19791" },
+    { "Hockney1988",
+      "R. W. Hockney and J. W. Eastwood",
+      "Computer simulation using particles",
+      "IOP, Bristol",
+      1, 1988, "1" },
+    { "Ballenegger2012",
+      "V. Ballenegger, J.J. Cerda, and C. Holm",
+      "How to Convert SPME to P3M: Influence Functions and Error Estimates",
+      "J. Chem. Theory Comput.",
+      8, 2012, "936-947" },
+    { "Garmay2012",
+      "Garmay Yu, Shvetsov A, Karelov D, Lebedev D, Radulescu A, Petukhov M, Isaev-Ivanov V",
+      "Correlated motion of protein subdomains and large-scale conformational flexibility of RecA protein filament",
+      "Journal of Physics: Conference Series",
+      340, 2012, "012094" }
   };
 #define NSTR (int)asize(citedb)
   
@@ -622,7 +636,7 @@ void gmx_print_version_info(FILE *fp)
     fprintf(fp, "Precision:        single\n");
 #endif
 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
     fprintf(fp, "Parallellization: thread_mpi\n");
 #elif defined(GMX_MPI)
     fprintf(fp, "Parallellization: MPI\n");
@@ -632,8 +646,6 @@ void gmx_print_version_info(FILE *fp)
 
 #ifdef GMX_FFT_FFTPACK
     fprintf(fp, "FFT Library:      fftpack\n");
-#elif defined(GMX_FFT_FFTW2)
-    fprintf(fp, "FFT Library:      fftw2\n");
 #elif defined(GMX_FFT_FFTW3)
     fprintf(fp, "FFT Library:      fftw3\n");
 #elif defined(GMX_FFT_MKL)

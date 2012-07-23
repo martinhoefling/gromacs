@@ -84,8 +84,8 @@ static void fill_ft_ind(int nft,int *ft,t_idef *idef,
 		  idef->iparams[i].harmonic.krA);
 	  break;
 	case F_UREY_BRADLEY:
-	  sprintf(buf,"UB_th=%.1f_%.2f2f",idef->iparams[i].u_b.theta,
-		  idef->iparams[i].u_b.ktheta);
+	  sprintf(buf,"UB_th=%.1f_%.2f2f",idef->iparams[i].u_b.thetaA,
+		  idef->iparams[i].u_b.kthetaA);
 	  break;
 	case F_QUARTIC_ANGLES:
 	  sprintf(buf,"Q_th=%.1f_%.2f_%.2f",idef->iparams[i].qangle.theta,
@@ -218,7 +218,7 @@ int main(int argc,char *argv[])
     { "-hyd", FALSE, etBOOL, {&bH},
       "Include angles with atoms with mass < 1.5" },
     { "-hq", FALSE, etREAL, {&hq},
-      "Ignore angles with atoms with mass < 1.5 and |q| < hq" }
+      "Ignore angles with atoms with mass < 1.5 and magnitude of their charge less than this value" }
   };
  
   output_env_t oenv;

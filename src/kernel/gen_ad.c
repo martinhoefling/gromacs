@@ -110,20 +110,6 @@ static int dcomp(const void *d1, const void *d2)
     return (p1->AL-p2->AL);
 }
 
-
-static gmx_bool aeq(t_param *p1, t_param *p2)
-{
-  if (p1->AJ!=p2->AJ)
-    return FALSE;
-  else if (((p1->AI==p2->AI) && (p1->AK==p2->AK)) ||
-           ((p1->AI==p2->AK) && (p1->AK==p2->AI)))
-    return TRUE;
-  else
-    return FALSE;
-}
-
-
-
 static gmx_bool deq(t_param *p1, t_param *p2)
 {
   if (((p1->AJ==p2->AJ) && (p1->AK==p2->AK)) ||
@@ -286,11 +272,6 @@ static int eq_imp(atom_id a1[],atom_id a2[])
   return TRUE;
 }
 
-static gmx_bool ideq(t_param *p1, t_param *p2)
-{
-  return eq_imp(p1->a,p2->a);
-}
-
 static int idcomp(const void *a,const void *b)
 {
   t_param *pa,*pb;
@@ -322,22 +303,6 @@ static void sort_id(int nr,t_param ps[])
   /* Now sort it */
   if (nr > 1)
     qsort(ps,nr,(size_t)sizeof(ps[0]),idcomp);
-}
-
-static void dump_param(FILE *fp,char *title,int n,t_param ps[])
-{
- int i,j;
-  
-  fprintf(fp,"%s: %d entries\n",title,n);
-  for(i=0; (i<n); i++) {
-    fprintf(fp,"%3d:  A=[ ",i);
-    for(j=0; (j<MAXATOMLIST); j++)
-      fprintf(fp," %5d",ps[i].a[j]);
-    fprintf(fp,"]  C=[");
-    for(j=0; (j<MAXFORCEPARAM); j++)
-      fprintf(fp," %10.5e",ps[i].c[j]);
-    fprintf(fp,"]\n");  
-  }
 }
 
 static int n_hydro(atom_id a[],char ***atomname)
@@ -452,7 +417,7 @@ static int get_impropers(t_atoms *atoms,t_hackblock hb[],t_param **idih,
 	bStop=FALSE;
 	for(k=0; (k<4) && !bStop; k++) {
 	  ai[k] = search_atom(idihs->b[j].a[k],start,
-			      atoms->nr,atoms->atom,atoms->atomname,
+                          atoms,
 			      "improper",bAllowMissing);
 	  if (ai[k] == NO_ATID)
 	    bStop = TRUE;
@@ -535,10 +500,10 @@ static void gen_excls(t_atoms *atoms, t_excls *excls, t_hackblock hb[],
       
       for(e=0; e<hbexcl->nb; e++) {
 	anm = hbexcl->b[e].a[0];
-	i1 = search_atom(anm,astart,atoms->nr,atoms->atom,atoms->atomname,
+	i1 = search_atom(anm,astart,atoms,
 			 "exclusion",bAllowMissing);
 	anm = hbexcl->b[e].a[1];
-	i2 = search_atom(anm,astart,atoms->nr,atoms->atom,atoms->atomname,
+	i2 = search_atom(anm,astart,atoms,
 			 "exclusion",bAllowMissing);
 	if (i1!=NO_ATID && i2!=NO_ATID) {
 	  if (i1 > i2) {

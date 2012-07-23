@@ -762,40 +762,6 @@ gmx_localtop_t *split_system(FILE *log,
   return top;
 }
 
-static void create_vsitelist(int nindex, int *list,
-                             int *targetn, int **listptr)
-{
-  int i,j,k,inr;
-  int minidx;
-  int *newlist;
-
-  /* remove duplicates */
-  for(i=0;i<nindex;i++) {
-    inr=list[i];
-    for(j=i+1;j<nindex;j++) {
-      if(list[j]==inr) {
-        for(k=j;k<nindex-1;k++)
-          list[k]=list[k+1];
-        nindex--;
-      }
-    }
-  }
-
-  *targetn=nindex;
-  snew(newlist,nindex);
-  
-  /* sort into the new array */
-  for(i=0;i<nindex;i++) {
-    inr=-1;
-    for(j=0;j<nindex;j++)
-      if(list[j]>0 && (inr==-1 || list[j]<list[inr])) 
-        inr=j; /* smallest so far */
-    newlist[i]=list[inr];
-    list[inr]=-1;
-  }
-  *listptr=newlist;
-}
-  
 static void
 add_to_vsitelist(int **list, int *nitem, int *nalloc,int newitem)
 {
@@ -911,13 +877,19 @@ gmx_bool setup_parallel_vsites(t_idef *idef,t_commrec *cr,
 
 t_state *partdec_init_local_state(t_commrec *cr,t_state *state_global)
 {
+  int i;
   t_state *state_local;
 
   snew(state_local,1);
 
   /* Copy all the contents */
   *state_local = *state_global;
-
+  snew(state_local->lambda,efptNR);
+  /* local storage for lambda */
+  for (i=0;i<efptNR;i++)
+    {
+      state_local->lambda[i] = state_global->lambda[i];
+    }
   if (state_global->nrngi > 1) {
     /* With stochastic dynamics we need local storage for the random state */
     if (state_local->flags & (1<<estLD_RNG)) {

@@ -36,6 +36,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+#include "gmx_header_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,7 +65,7 @@
 #include "gmxfio.h"
 #include "string2.h"
 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include "thread_mpi.h"
 #endif
 
@@ -76,7 +77,7 @@
 #include <unistd.h>
 #endif
 
-#if ((defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64) && !defined __CYGWIN__ && !defined __CYGWIN32__)
+#ifdef GMX_NATIVE_WINDOWS
 #include <process.h>
 #endif
 
@@ -87,50 +88,6 @@ gmx_ctime_r(const time_t *clock,char *buf, int n);
 
 
 #define BUFSIZE	1024
-
-/* this is not strictly thread-safe, but it's only written to at the beginning
-   of the simulation, once by each thread with the same value. We assume
-   that writing to an int is atomic.*/
-static gmx_bool parallel_env_val;
-#ifdef GMX_THREADS
-tMPI_Thread_mutex_t parallel_env_mutex=TMPI_THREAD_MUTEX_INITIALIZER;
-#endif
-
-
-/* returns 1 when running in a parallel environment, so could also be 1 if
-   mdrun was started with: mpirun -np 1.
-     
-   Use this function only to check whether a parallel environment has   
-   been initialized, for example when checking whether gmx_finalize()   
-   needs to be called. Use PAR(cr) to check whether the simulation actually
-   has more than one node/thread.  */
-gmx_bool gmx_parallel_env_initialized(void)
-{
-    gmx_bool ret;
-#ifdef GMX_THREADS
-    tMPI_Thread_mutex_lock(&parallel_env_mutex);
-#endif
-    ret=parallel_env_val;
-#ifdef GMX_THREADS
-    tMPI_Thread_mutex_unlock(&parallel_env_mutex);
-#endif
-    return ret;
-}
-
-static void set_parallel_env(gmx_bool val)
-{
-#ifdef GMX_THREADS
-    tMPI_Thread_mutex_lock(&parallel_env_mutex);
-#endif
-    if (!parallel_env_val)
-    {
-        /* we only allow it to be set, not unset */
-        parallel_env_val=val;
-    }
-#ifdef GMX_THREADS
-    tMPI_Thread_mutex_unlock(&parallel_env_mutex);
-#endif
-}
 
 
 static void par_fn(char *base,int ftp,const t_commrec *cr,
@@ -269,7 +226,7 @@ void gmx_log_open(const char *lognm,const t_commrec *cr,gmx_bool bMasterOnly,
   
     /* Communicate the filename for logfile */
     if (cr->nnodes > 1 && !bMasterOnly
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         /* With thread MPI the non-master log files are opened later
          * when the files names are already known on all nodes.
          */
@@ -327,7 +284,7 @@ void gmx_log_open(const char *lognm,const t_commrec *cr,gmx_bool bMasterOnly,
     time(&t);
 
 #ifndef NO_GETPID
-#   if ((defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64) && !defined __CYGWIN__ && !defined __CYGWIN32__)
+#   ifdef GMX_NATIVE_WINDOWS
     pid = _getpid();
 #   else
     pid = getpid();
@@ -353,12 +310,18 @@ void gmx_log_open(const char *lognm,const t_commrec *cr,gmx_bool bMasterOnly,
             "Log file opened on %s"
             "Host: %s  pid: %d  nodeid: %d  nnodes:  %d\n",
             timebuf,host,pid,cr->nodeid,cr->nnodes);
-
-#if (defined BUILD_MACHINE && defined BUILD_TIME && defined BUILD_USER) 
     fprintf(fp,
-            "The Gromacs distribution was built %s by\n"
-            "%s (%s)\n\n\n",BUILD_TIME,BUILD_USER,BUILD_MACHINE);
-#endif
+            "Built %s by %s\n"
+            "Build os/architecture: %s\n"
+            "Build CPU Vendor: %s  Brand: %s\n"
+            "Build CPU Family: %d  Model: %d  Stepping: %d\n"
+            "Build CPU Features: %s\n"
+            "Compiler: %s\n"
+            "CFLAGS: %s\n\n",
+            BUILD_TIME,BUILD_USER,BUILD_HOST,
+            BUILD_CPU_VENDOR,BUILD_CPU_BRAND,
+            BUILD_CPU_FAMILY,BUILD_CPU_MODEL,BUILD_CPU_STEPPING,
+            BUILD_CPU_FEATURES,BUILD_COMPILER,BUILD_CFLAGS);
 
     fflush(fp);
     debug_gmx();
@@ -378,7 +341,7 @@ static void comm_args(const t_commrec *cr,int *argc,char ***argv)
 {
   int i,len;
   
-  if ((cr) && PAR(cr))
+  if (PAR(cr))
     gmx_bcast(sizeof(*argc),argc,cr);
   
   if (!MASTER(cr))
@@ -445,7 +408,7 @@ void init_multisystem(t_commrec *cr,int nsim, char **multidirs,
     MPI_Comm_create(MPI_COMM_WORLD,ms->mpi_group_masters,
                     &ms->mpi_comm_masters);
 
-#if !defined(GMX_THREADS) && !defined(MPI_IN_PLACE_EXISTS)
+#if !defined(GMX_THREAD_MPI) && !defined(MPI_IN_PLACE_EXISTS)
     /* initialize the MPI_IN_PLACE replacement buffers */
     snew(ms->mpb, 1);
     ms->mpb->ibuf=NULL;
@@ -526,51 +489,38 @@ t_commrec *init_par(int *argc,char ***argv_ptr)
 
     argv = *argv_ptr;
 
-#ifdef GMX_MPI
-#ifdef GMX_LIB_MPI
-    pe = TRUE;
-#ifdef GMX_CHECK_MPI_ENV
-    /* Do not use MPI calls when env.var. GMX_CHECK_MPI_ENV is not set */
-    if (getenv(GMX_CHECK_MPI_ENV) == NULL)
-        pe = FALSE;
-#endif /* GMX_CHECK_MPI_ENV */
-#endif /* GMX_LIB_MPI  */
-    set_parallel_env(pe);
-    if (pe) {
-        cr->sim_nodeid = gmx_setup(argc,argv,&cr->nnodes);
-    } else {
-        cr->nnodes     = 1;
-        cr->sim_nodeid = 0;
-    }
-#else /* GMX_MPI */
-    pe=FALSE;
-    set_parallel_env(pe);
-    cr->sim_nodeid   = 0;
-    cr->nnodes       = 1;
-#endif /* GMX_MPI */
+#if defined GMX_MPI && !defined GMX_THREAD_MPI
+    cr->sim_nodeid = gmx_setup(argc,argv,&cr->nnodes);
 
     if (!PAR(cr) && (cr->sim_nodeid != 0))
-        gmx_comm("(!PAR(cr) && (cr->sim_nodeid != 0))");
-
-    if (PAR(cr)) 
     {
-#ifdef GMX_MPI
-        cr->mpi_comm_mysim = MPI_COMM_WORLD;
-        cr->mpi_comm_mygroup = cr->mpi_comm_mysim;
-#endif /* GMX_MPI */
+        gmx_comm("(!PAR(cr) && (cr->sim_nodeid != 0))");
     }
+
+    cr->mpi_comm_mysim   = MPI_COMM_WORLD;
+    cr->mpi_comm_mygroup = cr->mpi_comm_mysim;
+#else
+    /* These should never be accessed */
+    cr->mpi_comm_mysim   = NULL;
+    cr->mpi_comm_mygroup = NULL;
+    cr->nnodes           = 1;
+    cr->sim_nodeid       = 0;
+#endif
+
     cr->nodeid = cr->sim_nodeid;
 
     cr->duty = (DUTY_PP | DUTY_PME);
 
     /* Communicate arguments if parallel */
-#ifndef GMX_THREADS
+#ifndef GMX_THREAD_MPI
     if (PAR(cr))
+    {
         comm_args(cr,argc,argv_ptr);
-#endif /* GMX_THREADS */
+    }
+#endif /* GMX_THREAD_MPI */
 
 #ifdef GMX_MPI
-#if !defined(GMX_THREADS) && !defined(MPI_IN_PLACE_EXISTS)
+#if !defined(GMX_THREAD_MPI) && !defined(MPI_IN_PLACE_EXISTS)
   /* initialize the MPI_IN_PLACE replacement buffers */
   snew(cr->mpb, 1);
   cr->mpb->ibuf=NULL;
@@ -589,7 +539,7 @@ t_commrec *init_par(int *argc,char ***argv_ptr)
 
 t_commrec *init_par_threads(const t_commrec *cro)
 {
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
     int initialized;
     t_commrec *cr;
 
@@ -602,8 +552,9 @@ t_commrec *init_par_threads(const t_commrec *cro)
     /* and we start setting our own thread-specific values for things */
     MPI_Initialized(&initialized);
     if (!initialized)
+    {
         gmx_comm("Initializing threads without comm");
-    set_parallel_env(TRUE);
+    }
     /* once threads will be used together with MPI, we'll
        fill the cr structure with distinct data here. This might even work: */
     cr->sim_nodeid = gmx_setup(0,NULL, &cr->nnodes);
@@ -617,21 +568,4 @@ t_commrec *init_par_threads(const t_commrec *cro)
 #else
     return NULL;
 #endif
-}
-
-
-t_commrec *init_cr_nopar(void)
-{
-    t_commrec *cr;
-
-    snew(cr,1);
-
-    cr->nnodes     = 1; 
-    /* cr->nthreads   = 1; */
-    cr->sim_nodeid = 0;
-    cr->nodeid     = 0;
-    /* cr->threadid   = 0; */
-    cr->duty       = (DUTY_PP | DUTY_PME);
-
-    return cr;
 }

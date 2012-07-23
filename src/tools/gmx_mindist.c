@@ -40,7 +40,7 @@
 #include <stdlib.h>
 
 #include "sysstuff.h"
-#include "string.h"
+#include <string.h>
 #include "typedefs.h"
 #include "smalloc.h"
 #include "macros.h"
@@ -387,7 +387,7 @@ void dist_plot(const char *fn,const char *afile,const char *dfile,
     fprintf(dist,"\n");
     if (num) 
       fprintf(num,"\n");
-    if ( bMin?min1:max1 != -1 )
+    if ( (bMin?min1:max1) != -1 )
       if (atm)
 	fprintf(atm,"%12e  %12d  %12d\n",
 		output_env_conv_time(oenv,t),1+(bMin ? min1 : max1),

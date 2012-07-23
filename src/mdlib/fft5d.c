@@ -43,22 +43,26 @@
 #ifdef NOGMX
 #define GMX_PARALLEL_ENV_INITIALIZED 1
 #else 
-#include "main.h"
-#define GMX_PARALLEL_ENV_INITIALIZED gmx_parallel_env_initialized()
+#ifdef GMX_MPI
+#define GMX_PARALLEL_ENV_INITIALIZED 1
+#else
+#define GMX_PARALLEL_ENV_INITIALIZED 0
+#endif
 #endif
 
 #ifdef GMX_LIB_MPI
 #include <mpi.h>
 #endif
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include "tmpi.h"
 #endif
 
 #ifdef GMX_OPENMP
+/* TODO: Do we still need this? Are we still planning ot use fftw + OpenMP? */
 #define FFT5D_THREADS
 #endif
 #ifdef FFT5D_THREADS
-#include <omp.h>
+#include "gmx_omp.h"
 /* requires fftw compiled with openmp */
 /* #define FFT5D_FFTW_THREADS (now set by cmake) */
 #endif
@@ -67,6 +71,7 @@
 #include <float.h>
 #include <math.h>
 #include <assert.h>
+#include "smalloc.h"
 
 #ifndef __FLT_EPSILON__
 #define __FLT_EPSILON__ FLT_EPSILON
@@ -81,17 +86,17 @@ FILE* debug=0;
 
 
 #ifdef GMX_FFT_FFTW3 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 /* none of the fftw3 calls, except execute(), are thread-safe, so 
    we need to serialize them with this mutex. */
 static tMPI_Thread_mutex_t big_fftw_mutex=TMPI_THREAD_MUTEX_INITIALIZER;
 
 #define FFTW_LOCK tMPI_Thread_mutex_lock(&big_fftw_mutex)
 #define FFTW_UNLOCK tMPI_Thread_mutex_unlock(&big_fftw_mutex)
-#else /* GMX_THREADS */
+#else /* GMX_THREAD_MPI */
 #define FFTW_LOCK 
 #define FFTW_UNLOCK 
-#endif /* GMX_THREADS */
+#endif /* GMX_THREAD_MPI */
 #endif /* GMX_FFT_FFTW3 */
 
 static double fft5d_fmax(double a, double b){
@@ -145,35 +150,6 @@ static int vmax(int* a, int s) {
     }
     return max;
 } 
-
-/*
-copied here from fftgrid, because:
-1. function there not publically available
-2. not sure whether we keep fftgrid
-3. less dependencies for fft5d
-
-Only used for non-fftw case
-*/
-static void *
-gmx_calloc_aligned(size_t size)
-{
-    void *p0,*p;
-    
-    /*We initialize by zero for Valgrind
-      For non-divisible case we communicate more than the data.
-      If we don't initialize the data we communicate uninitialized data*/
-    p0 = calloc(size+32,1);  
-    
-    if(p0 == NULL)
-    {
-        gmx_fatal(FARGS,"Failed to allocated %u bytes of aligned memory.",size+32);
-    }
-    
-    p = (void *) (((size_t) p0 + 32) & (~((size_t) 31)));
-    
-    /* Yeah, yeah, we cannot free this pointer, but who cares... */
-    return p;
-}
 
 
 /* NxMxK the size of the data
@@ -394,6 +370,7 @@ fft5d_plan fft5d_plan_3d(int NG, int MG, int KG, MPI_Comm comm[2], int flags, t_
         free(N1); free(oN1); /*these are not used for this order*/
         free(K0); free(oK0); /*the rest is freed in destroy*/
     }
+    N[2]=pN[2]=-1; /*not used*/
     
     /*
       Difference between x-y-z regarding 2d decomposition is whether they are 
@@ -404,10 +381,10 @@ fft5d_plan fft5d_plan_3d(int NG, int MG, int KG, MPI_Comm comm[2], int flags, t_
     lsize = fft5d_fmax(N[0]*M[0]*K[0]*nP[0],fft5d_fmax(N[1]*M[1]*K[1]*nP[1],C[2]*M[2]*K[2])); 
     /* int lsize = fmax(C[0]*M[0]*K[0],fmax(C[1]*M[1]*K[1],C[2]*M[2]*K[2])); */
     if (!(flags&FFT5D_NOMALLOC)) { 
-        lin = (t_complex*)gmx_calloc_aligned(sizeof(t_complex) * lsize);   
-        lout = (t_complex*)gmx_calloc_aligned(sizeof(t_complex) * lsize); 
-        lout2 = (t_complex*)gmx_calloc_aligned(sizeof(t_complex) * lsize);
-        lout3 = (t_complex*)gmx_calloc_aligned(sizeof(t_complex) * lsize);
+        snew_aligned(lin, lsize, 32);
+        snew_aligned(lout, lsize, 32);
+        snew_aligned(lout2, lsize, 32);
+        snew_aligned(lout3, lsize, 32);
     } else {
         lin = *rlin;
         lout = *rlout;
@@ -754,7 +731,7 @@ static void joinAxesTrans12(t_complex* lout,const t_complex* lin,int maxN,int ma
 }
 
 
-static void rotate(int x[]) {
+static void rotate_offsets(int x[]) {
     int t=x[0];
 /*    x[0]=x[2];
     x[2]=x[1];
@@ -816,15 +793,15 @@ static void compute_offsets(fft5d_plan plan, int xs[], int xl[], int xc[], int N
     /*input order is different for test program to match FFTW order 
       (important for complex to real)*/
     if (plan->flags&FFT5D_BACKWARD) {
-        rotate(xs);
-        rotate(xl);
-        rotate(xc);
-        rotate(NG);
+        rotate_offsets(xs);
+        rotate_offsets(xl);
+        rotate_offsets(xc);
+        rotate_offsets(NG);
         if (plan->flags&FFT5D_ORDER_YZ) {
-            rotate(xs);
-            rotate(xl);
-            rotate(xc);
-            rotate(NG);            
+            rotate_offsets(xs);
+            rotate_offsets(xl);
+            rotate_offsets(xc);
+            rotate_offsets(NG);
         }
     }
     if ((plan->flags&FFT5D_REALCOMPLEX) && ((!(plan->flags&FFT5D_BACKWARD) && s==0) || ((plan->flags&FFT5D_BACKWARD) && s==2))) {
@@ -909,7 +886,7 @@ void fft5d_execute(fft5d_plan plan,int thread,fft5d_time times) {
         for (s=0;s<2;s++) {  /*loop over first two FFT steps (corner rotations)*/
 
 #ifdef GMX_MPI
-        if (GMX_PARALLEL_ENV_INITIALIZED && cart[s] !=0 && P[s]>1 )
+        if (GMX_PARALLEL_ENV_INITIALIZED && cart[s]!=MPI_COMM_NULL && P[s]>1)
         {
             bParallelDim = 1;
         }
@@ -1159,8 +1136,13 @@ void fft5d_destroy(fft5d_plan plan) {
 #endif /* FFT5D_MPI_TRANSPOS */
 #endif /* GMX_FFT_FFTW3 */
 
-    /*We can't free lin/lout here - is allocated by gmx_calloc_aligned which can't be freed*/
-
+    if (!(plan->flags&FFT5D_NOMALLOC))
+    {
+        sfree_aligned(plan->lin);
+        sfree_aligned(plan->lout);
+        sfree_aligned(plan->lout2);
+        sfree_aligned(plan->lout3);
+    }
     
 #ifdef FFT5D_THREADS
 #ifdef FFT5D_FFTW_THREADS

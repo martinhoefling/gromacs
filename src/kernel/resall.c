@@ -479,23 +479,6 @@ void print_resall(FILE *out, int nrtp, t_restp rtp[],
  *                  SEARCH   ROUTINES
  * 
  ***********************************************************/
-static int neq_str(const char *a1,const char *a2)
-{
-    int j,l,l1,l2;;
-  
-    l1 = (int)strlen(a1);
-    l2 = (int)strlen(a2);
-    l = min(l1,l2);
-    
-    j=0;
-    while (j < l && toupper(a1[j]) == toupper(a2[j]))
-    {
-        j++;
-    }
-
-    return j;
-}
-
 static gmx_bool is_sign(char c)
 {
     return (c == '+' || c == '-');
@@ -547,8 +530,8 @@ char *search_rtp(const char *key,int nrtp,t_restp rtp[])
             /* Allow a mismatch of at most a sign character (with warning) */
             n = neq_str_sign(key,rtp[i].resname);
             if (n >= best &&
-                n+1 >= strlen(key) &&
-                n+1 >= strlen(rtp[i].resname))
+                n+1 >= (int)strlen(key) &&
+                n+1 >= (int)strlen(rtp[i].resname))
             {
                 if (n == best)
                 {

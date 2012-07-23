@@ -783,7 +783,7 @@ void* openmm_init(FILE *fplog, const char *platformOptStr,
             if (pluginDir != NULL && *pluginDir != '\0')
             {
                 loadedPlugins = Platform::loadPluginsFromDirectory(pluginDir);
-                if (loadedPlugins.size() > 0)
+                if (!loadedPlugins.empty())
                 {
                     hasLoadedPlugins = true;
                     usedPluginDir = pluginDir;
@@ -801,7 +801,7 @@ void* openmm_init(FILE *fplog, const char *platformOptStr,
             if (!hasLoadedPlugins)
             {
                 loadedPlugins = Platform::loadPluginsFromDirectory(OPENMM_PLUGIN_DIR);
-                if (loadedPlugins.size() > 0)
+                if (!loadedPlugins.empty())
                 {
                     hasLoadedPlugins = true;
                     usedPluginDir = OPENMM_PLUGIN_DIR;
@@ -812,7 +812,7 @@ void* openmm_init(FILE *fplog, const char *platformOptStr,
             if (!hasLoadedPlugins)
             {
                 loadedPlugins = Platform::loadPluginsFromDirectory(Platform::getDefaultPluginsDirectory());
-                if (loadedPlugins.size() > 0)
+                if (!loadedPlugins.empty())
                 {
                     hasLoadedPlugins = true;
                     usedPluginDir = Platform::getDefaultPluginsDirectory();
@@ -926,10 +926,10 @@ void* openmm_init(FILE *fplog, const char *platformOptStr,
             int atom3 = ubAtoms[offset++];
             /* ubBondForce->addBond(atom1, atom3, */
             bondForce->addBond(atom1, atom3,
-                               idef.iparams[type].u_b.r13, idef.iparams[type].u_b.kUB);
+                               idef.iparams[type].u_b.r13A, idef.iparams[type].u_b.kUBA);
             /* ubAngleForce->addAngle(atom1, atom2, atom3, */ 
             angleForce->addAngle(atom1, atom2, atom3, 
-                    idef.iparams[type].u_b.theta*M_PI/180.0, idef.iparams[type].u_b.ktheta);
+                    idef.iparams[type].u_b.thetaA*M_PI/180.0, idef.iparams[type].u_b.kthetaA);
         }
 
 		/* Set proper dihedral terms */

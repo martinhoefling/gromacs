@@ -37,11 +37,6 @@
 #include <config.h>
 #endif
 
-#if ((defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64) && !defined __CYGWIN__ && !defined __CYGWIN32__)
-/* _isnan() */
-#include <float.h>
-#endif
-
 #include "typedefs.h"
 #include "smalloc.h"
 #include "sysstuff.h"
@@ -68,8 +63,6 @@
 #include "ionize.h"
 #include "disre.h"
 #include "orires.h"
-#include "dihre.h"
-#include "pppm.h"
 #include "pme.h"
 #include "mdatoms.h"
 #include "repl_ex.h"
@@ -86,7 +79,9 @@
 #include "checkpoint.h"
 #include "mtop_util.h"
 #include "sighandler.h"
+#include "txtdump.h"
 #include "string2.h"
+#include "membed.h"
 
 #ifdef GMX_IMD
 #include "imd.h"
@@ -95,14 +90,13 @@
 #ifdef GMX_LIB_MPI
 #include <mpi.h>
 #endif
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include "tmpi.h"
 #endif
 
 #ifdef GMX_FAHCORE
 #include "corewrap.h"
 #endif
-
 
 double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
              const output_env_t oenv, gmx_bool bVerbose,gmx_bool bCompact,
@@ -115,7 +109,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
              t_mdatoms *mdatoms,
              t_nrnb *nrnb,gmx_wallcycle_t wcycle,
              gmx_edsam_t ed,t_forcerec *fr,
-             int repl_ex_nst,int repl_ex_seed,
+             int repl_ex_nst,int repl_ex_nex,int repl_ex_seed,gmx_membed_t membed,
              real cpt_period,real max_hours,
              const char *deviceOptions,
              int imdport, int imdfreq,
@@ -125,16 +119,16 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     gmx_mdoutf_t *outf;
     gmx_large_int_t step,step_rel;
     double     run_time;
-    double     t,t0,lam0;
-    gmx_bool       bGStatEveryStep,bGStat,bNstEner,bCalcEnerPres;
-    gmx_bool       bNS,bNStList,bSimAnn,bStopCM,bRerunMD,bNotLastFrame=FALSE,
-               bFirstStep,bStateFromTPX,bInitStep,bLastStep,
+    double     t,t0,lam0[efptNR];
+    gmx_bool   bGStatEveryStep,bGStat,bNstEner,bCalcEnerPres,bEnergyHere;
+    gmx_bool   bNS,bNStList,bSimAnn,bStopCM,bRerunMD,bNotLastFrame=FALSE,
+               bFirstStep,bStateFromCP,bStateFromTPX,bInitStep,bLastStep,
                bBornRadii,bStartingFromCpt;
-    gmx_bool       bDoDHDL=FALSE;
-    gmx_bool       do_ene,do_log,do_verbose,bRerunWarnNoV=TRUE,
+    gmx_bool   bDoDHDL=FALSE,bDoFEP=FALSE,bDoExpanded=FALSE;
+    gmx_bool   do_ene,do_log,do_verbose,bRerunWarnNoV=TRUE,
                bForceUpdate=FALSE,bCPT;
     int        mdof_flags;
-    gmx_bool       bMasterState;
+    gmx_bool   bMasterState;
     int        force_flags,cglo_flags;
     tensor     force_vir,shake_vir,total_vir,tmp_vir,pres;
     int        i,m;
@@ -147,9 +141,9 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     t_trxframe rerun_fr;
     gmx_repl_ex_t repl_ex=NULL;
     int        nchkpt=1;
-
     gmx_localtop_t *top;	
     t_mdebin *mdebin=NULL;
+    df_history_t df_history;
     t_state    *state=NULL;
     rvec       *f_global=NULL;
     int        n_xtc=-1;
@@ -160,7 +154,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     gmx_update_t upd=NULL;
     t_graph    *graph=NULL;
     globsig_t   gs;
-
+    gmx_rng_t mcrng=NULL;
     gmx_bool        bFFscan;
     gmx_groups_t *groups;
     gmx_ekindata_t *ekind, *ekind_save;
@@ -173,7 +167,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     gmx_bool        bAppend;
     gmx_bool        bResetCountersHalfMaxH=FALSE;
     gmx_bool        bVV,bIterations,bFirstIterate,bTemp,bPres,bTrotter;
-    real        temp0,mu_aver=0,dvdl;
+    real        mu_aver=0,dvdl;
     int         a0,a1,gnx=0,ii;
     atom_id     *grpindex=NULL;
     char        *grpname;
@@ -183,6 +177,11 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
 	tensor      tmpvir;
 	real        fom,oldfom,veta_save,pcurr,scalevir,tracevir;
 	real        vetanew = 0;
+    int         lamnew=0;
+    /* for FEP */
+    int         fep_state=0;
+    int         nstfep;
+    real        rate;
     double      cycles;
 	real        saved_conserved_quantity = 0;
     real        last_ekin = 0;
@@ -195,6 +194,17 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     gmx_large_int_t multisim_nsteps=-1; /* number of steps to do  before first multisim 
                                           simulation stops. If equal to zero, don't
                                           communicate any more between multisims.*/
+
+    if(MASTER(cr))
+    {
+        fprintf(stderr,
+                "\n* WARNING * WARNING * WARNING * WARNING * WARNING * WARNING *\n"
+                "We have just committed the new CPU detection code in this branch,\n"
+                "and will commit new SSE/AVX kernels in a few days. However, this\n"
+                "means that currently only the NxN kernels are accelerated!\n"
+                "In the mean time, you might want to avoid production runs in 4.6.\n\n");
+    }
+
 #ifdef GMX_FAHCORE
     /* Temporary addition for FAHCORE checkpointing */
     int chkpt_ret;
@@ -225,8 +235,8 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         snew(cbuf,top_global->natoms);
     }
     /* all the iteratative cases - only if there are constraints */ 
-    bIterations = ((IR_NPT_TROTTER(ir)) && (constr) && (!bRerunMD));
-    bTrotter = (bVV && (IR_NPT_TROTTER(ir) || (IR_NVT_TROTTER(ir))));        
+    bIterations = ((IR_NPH_TROTTER(ir) || IR_NPT_TROTTER(ir)) && (constr) && (!bRerunMD));
+    bTrotter = (bVV && (IR_NPT_TROTTER(ir) || IR_NPH_TROTTER(ir) || IR_NVT_TROTTER(ir)));
     
     if (bRerunMD)
     {
@@ -263,7 +273,8 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     groups = &top_global->groups;
 
     /* Initial values */
-    init_md(fplog,cr,ir,oenv,&t,&t0,&state_global->lambda,&lam0,
+    init_md(fplog,cr,ir,oenv,&t,&t0,state_global->lambda,
+            &(state_global->fep_state),lam0,
             nrnb,top_global,&upd,
             nfile,fnm,&outf,&mdebin,
             force_vir,shake_vir,mu_tot,&bSimAnn,&vcm,state_global,Flags);
@@ -272,7 +283,8 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     clear_mat(pres);
     /* Energy terms and groups */
     snew(enerd,1);
-    init_enerdata(top_global->groups.grps[egcENER].nr,ir->n_flambda,enerd);
+    init_enerdata(top_global->groups.grps[egcENER].nr,ir->fepvals->n_lambda,
+                  enerd);
     if (DOMAINDECOMP(cr))
     {
         f = NULL;
@@ -281,6 +293,14 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     {
         snew(f,top_global->natoms);
     }
+
+    /* lambda Monte carlo random number generator  */
+    if (ir->bExpanded)
+    {
+        mcrng = gmx_rng_init(ir->expandedvals->lmc_seed);
+    }
+    /* copy the state into df_history */
+    copy_df_history(&df_history,&state_global->dfhist);
 
     /* Kinetic energy data */
     snew(ekind,1);
@@ -303,13 +323,13 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
 
     if (DEFORM(*ir))
     {
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         tMPI_Thread_mutex_lock(&deform_init_box_mutex);
 #endif
         set_deform_reference_box(upd,
                                  deform_init_init_step_tpx,
                                  deform_init_box_tpx);
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         tMPI_Thread_mutex_unlock(&deform_init_box_mutex);
 #endif
     }
@@ -382,11 +402,20 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                             nrnb,wcycle,FALSE);
     }
 
-    update_mdatoms(mdatoms,state->lambda);
+    update_mdatoms(mdatoms,state->lambda[efptMASS]);
+
+    if (opt2bSet("-cpi",nfile,fnm))
+    {
+        bStateFromCP = gmx_fexist_master(opt2fn_master("-cpi",nfile,fnm,cr),cr);
+    }
+    else
+    {
+        bStateFromCP = FALSE;
+    }
 
     if (MASTER(cr))
     {
-        if (opt2bSet("-cpi",nfile,fnm))
+        if (bStateFromCP)
         {
             /* Update mdebin with energy history if appending to output files */
             if ( Flags & MD_APPENDFILES )
@@ -406,9 +435,15 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         update_energyhistory(&state_global->enerhist,mdebin);
     }	
 
-    if ((state->flags & (1<<estLD_RNG)) && (Flags & MD_READ_RNG)) {
+    if ((state->flags & (1<<estLD_RNG)) && (Flags & MD_READ_RNG)) 
+    {
         /* Set the random state if we read a checkpoint file */
         set_stochd_state(upd,state);
+    }
+
+    if (state->flags & (1<<estMC_RNG))
+    {
+        set_mc_state(mcrng,state);
     }
 
     /* Initialize constraints */
@@ -440,9 +475,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
          * signals are initialized, too */
     }
     if (repl_ex_nst > 0 && MASTER(cr))
+    {
         repl_ex = init_replica_exchange(fplog,cr->ms,state_global,ir,
-                                        repl_ex_nst,repl_ex_seed);
-
+                                        repl_ex_nst,repl_ex_nex,repl_ex_seed); 
+    }
     if (!ir->bContinuation && !bRerunMD)
     {
         if (mdatoms->cFREEZE && (state->flags & (1<<estV)))
@@ -476,9 +512,21 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     }
 
     debug_gmx();
-  
+
+    /* set free energy calculation frequency as the minimum of nstdhdl, nstexpanded, and nstrepl_ex_nst*/
+    nstfep = ir->fepvals->nstdhdl;
+    if (ir->bExpanded && (nstfep > ir->expandedvals->nstexpanded))
+    {
+        nstfep = ir->expandedvals->nstexpanded;
+    }
+    if (repl_ex_nst > 0 && repl_ex_nst > nstfep)
+    {
+        nstfep = repl_ex_nst;
+    }
+
     /* I'm assuming we need global communication the first time! MRS */
     cglo_flags = (CGLO_TEMPERATURE | CGLO_GSTAT
+                  | ((ir->comm_mode != ecmNO) ? CGLO_STOPCM:0)
                   | (bVV ? CGLO_PRESSURE:0)
                   | (bVV ? CGLO_CONSTRAINT:0)
                   | (bRerunMD ? CGLO_RERUNMD:0)
@@ -486,7 +534,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     
     bSumEkinhOld = FALSE;
     compute_globals(fplog,gstat,cr,ir,fr,ekind,state,state_global,mdatoms,nrnb,vcm,
-                    wcycle,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
+                    NULL,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
                     constr,NULL,FALSE,state->box,
                     top_global,&pcurr,top_global->natoms,&bSumEkinhOld,cglo_flags);
     if (ir->eI == eiVVAK) {
@@ -497,10 +545,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
            perhaps loses some logic?*/
         
         compute_globals(fplog,gstat,cr,ir,fr,ekind,state,state_global,mdatoms,nrnb,vcm,
-                        wcycle,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
+                        NULL,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
                         constr,NULL,FALSE,state->box,
                         top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
-                        cglo_flags &~ CGLO_PRESSURE);
+                        cglo_flags &~ (CGLO_STOPCM | CGLO_PRESSURE));
     }
     
     /* Calculate the initial half step temperature, and save the ekinh_old */
@@ -516,7 +564,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         enerd->term[F_TEMP] *= 2; /* result of averages being done over previous and current step,
                                      and there is no previous step */
     }
-    temp0 = enerd->term[F_TEMP];
     
     /* if using an iterative algorithm, we need to create a working directory for the state. */
     if (bIterations) 
@@ -544,7 +591,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                     "RMS relative constraint deviation after constraining: %.2e\n",
                     constr_rmsd(constr,FALSE));
         }
-        fprintf(fplog,"Initial temperature: %g K\n",enerd->term[F_TEMP]);
+        if (EI_STATE_VELOCITY(ir->eI))
+        {
+            fprintf(fplog,"Initial temperature: %g K\n",enerd->term[F_TEMP]);
+        }
         if (bRerunMD)
         {
             fprintf(stderr,"starting md rerun '%s', reading coordinates from"
@@ -591,7 +641,9 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     print_date_and_time(fplog,cr->nodeid,"Started mdrun",runtime);
     wallcycle_start(wcycle,ewcRUN);
     if (fplog)
+    {
         fprintf(fplog,"\n");
+    }
 
     /* safest point to do file checkpointing is here.  More general point would be immediately before integrator call */
 #ifdef GMX_FAHCORE
@@ -659,7 +711,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     /* loop over MD steps or if rerunMD to end of input trajectory */
     bFirstStep = TRUE;
     /* Skip the first Nose-Hoover integration when we get the state from tpx */
-    bStateFromTPX = !opt2bSet("-cpi",nfile,fnm);
+    bStateFromTPX = !bStateFromCP;
     bInitStep = bFirstStep && (bStateFromTPX || bVV);
     bStartingFromCpt = (Flags & MD_STARTFROMCPT) && bInitStep;
     bLastStep    = FALSE;
@@ -711,18 +763,15 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             t = t0 + step*ir->delta_t;
         }
 
-        if (ir->efep != efepNO)
+        if (ir->efep != efepNO || ir->bSimTemp)
         {
-            if (bRerunMD && rerun_fr.bLambda && (ir->delta_lambda!=0))
-            {
-                state_global->lambda = rerun_fr.lambda;
-            }
-            else
-            {
-                state_global->lambda = lam0 + step*ir->delta_lambda;
-            }
-            state->lambda = state_global->lambda;
-            bDoDHDL = do_per_step(step,ir->nstdhdl);
+            /* find and set the current lambdas.  If rerunning, we either read in a state, or a lambda value,
+               requiring different logic. */
+            
+            set_current_lambdas(step,ir->fepvals,bRerunMD,&rerun_fr,state_global,state,lam0);
+            bDoDHDL = do_per_step(step,ir->fepvals->nstdhdl);
+            bDoFEP  = (do_per_step(step,nstfep) && (ir->efep != efepNO));
+            bDoExpanded  = (do_per_step(step,ir->expandedvals->nstexpanded) && (ir->bExpanded) && (step > 0));
         }
 
         if (bSimAnn) 
@@ -813,12 +862,12 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             /* Determine whether or not to do Neighbour Searching and LR */
             bNStList = (ir->nstlist > 0  && step % ir->nstlist == 0);
             
-            bNS = (bFirstStep || bExchanged || bNStList ||
+            bNS = (bFirstStep || bExchanged || bNStList || bDoFEP ||
                    (ir->nstlist == -1 && nlh.nabnsb > 0));
 
             if (bNS && ir->nstlist == -1)
             {
-                set_nlistheuristics(&nlh,bFirstStep || bExchanged,step);
+                set_nlistheuristics(&nlh,bFirstStep || bExchanged || bDoFEP, step);
             }
         } 
 
@@ -901,12 +950,12 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
 
         if (MASTER(cr) && do_log && !bFFscan)
         {
-            print_ebin_header(fplog,step,t,state->lambda);
+            print_ebin_header(fplog,step,t,state->lambda[efptFEP]); /* can we improve the information printed here? */
         }
 
         if (ir->efep != efepNO)
         {
-            update_mdatoms(mdatoms,state->lambda); 
+            update_mdatoms(mdatoms,state->lambda[efptMASS]);
         }
 
         if (bRerunMD && rerun_fr.bV)
@@ -935,11 +984,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         {
             if (update_forcefield(fplog,
                                   nfile,fnm,fr,
-                                  mdatoms->nr,state->x,state->box)) {
-                if (gmx_parallel_env_initialized())
-                {
-                    gmx_finalize();
-                }
+                                  mdatoms->nr,state->x,state->box))
+            {
+                gmx_finalize_par();
+
                 exit(0);
             }
         }
@@ -962,10 +1010,15 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         /* Determine the energy and pressure:
          * at nstcalcenergy steps and at energy output steps (set below).
          */
-        bNstEner = do_per_step(step,ir->nstcalcenergy);
+
+        if (EI_VV(ir->eI) && (!bInitStep)) {  /* for vv, the first half actually corresponds to the last step */
+            bNstEner = do_per_step(step-1,ir->nstcalcenergy);
+        } else {
+            bNstEner = do_per_step(step,ir->nstcalcenergy);
+        }
         bCalcEnerPres =
             (bNstEner ||
-             (ir->epc != epcNO && do_per_step(step,ir->nstpcouple)));
+             (ir->epc > epcNO && do_per_step(step,ir->nstpcouple)));
 
         /* Do we need global communication ? */
         bGStat = (bCalcEnerPres || bStopCM ||
@@ -982,7 +1035,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         
         /* these CGLO_ options remain the same throughout the iteration */
         cglo_flags = ((bRerunMD ? CGLO_RERUNMD : 0) |
-                      (bStopCM ? CGLO_STOPCM : 0) |
                       (bGStat ? CGLO_GSTAT : 0)
             );
         
@@ -992,7 +1044,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                        (bNStList ? GMX_FORCE_DOLR : 0) |
                        GMX_FORCE_SEPLRF |
                        (bCalcEnerPres ? GMX_FORCE_VIRIAL : 0) |
-                       (bDoDHDL ? GMX_FORCE_DHDL : 0)
+                       (bDoFEP ? GMX_FORCE_DHDL : 0)
             );
         
         if (shellfc)
@@ -1021,7 +1073,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
              * This is parallellized as well, and does communication too. 
              * Check comments in sim_util.c
              */
-        
             do_force(fplog,cr,ir,step,nrnb,wcycle,top,top_global,groups,
                      state->box,state->x,&state->hist,
                      f,force_vir,mdatoms,enerd,fcd,
@@ -1124,7 +1175,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                      called in the previous step */
                     unshift_self(graph,state->box,state->x);
                 }
-                
+
                 
                 /* if VV, compute the pressure and constraints */
                 /* For VV2, we strictly only need this if using pressure
@@ -1133,16 +1184,21 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                  * Think about ways around this in the future?
                  * For now, keep this choice in comments.
                  */
-                /*bPres = (ir->eI==eiVV || IR_NPT_TROTTER(ir)); */
-                    /*bTemp = ((ir->eI==eiVV &&(!bInitStep)) || (ir->eI==eiVVAK && IR_NPT_TROTTER(ir)));*/
+                /* bPres = (ir->eI==eiVV || IR_NPT_TROTTER(ir)); */
+                /*bTemp = ((ir->eI==eiVV &&(!bInitStep)) || (ir->eI==eiVVAK && IR_NPT_TROTTER(ir)));*/
                 bPres = TRUE;
                 bTemp = ((ir->eI==eiVV &&(!bInitStep)) || (ir->eI==eiVVAK));
+                if (bNstEner && ir->eI==eiVVAK)  /*MRS:  7/9/2010 -- this still doesn't fix it?*/
+                {
+                    bSumEkinhOld = TRUE;
+                }
                 compute_globals(fplog,gstat,cr,ir,fr,ekind,state,state_global,mdatoms,nrnb,vcm,
                                 wcycle,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
                                 constr,NULL,FALSE,state->box,
                                 top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
                                 cglo_flags 
                                 | CGLO_ENERGY 
+                                | (bStopCM ? CGLO_STOPCM : 0)
                                 | (bTemp ? CGLO_TEMPERATURE:0) 
                                 | (bPres ? CGLO_PRESSURE : 0) 
                                 | (bPres ? CGLO_CONSTRAINT : 0)
@@ -1181,6 +1237,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             }
 
             if (bTrotter && !bInitStep) {
+                enerd->term[F_DVDL_BONDED] += dvdl;        /* only add after iterations */
                 copy_mat(shake_vir,state->svir_prev);
                 copy_mat(force_vir,state->fvir_prev);
                 if (IR_NVT_TROTTER(ir) && ir->eI==eiVV) {
@@ -1198,27 +1255,36 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             {
                 fprintf(fplog,sepdvdlformat,"Constraint",0.0,dvdl);
             }
-            enerd->term[F_DHDL_CON] += dvdl;
+            enerd->term[F_DVDL_BONDED] += dvdl;
             
             GMX_MPE_LOG(ev_timestep1);
         }
-    
+
         /* MRS -- now done iterating -- compute the conserved quantity */
         if (bVV) {
             saved_conserved_quantity = compute_conserved_from_auxiliary(ir,state,&MassQ);
             if (ir->eI==eiVV) 
             {
-                last_ekin = enerd->term[F_EKIN]; /* does this get preserved through checkpointing? */
+                last_ekin = enerd->term[F_EKIN];
             }
             if ((ir->eDispCorr != edispcEnerPres) && (ir->eDispCorr != edispcAllEnerPres)) 
             {
                 saved_conserved_quantity -= enerd->term[F_DISPCORR];
             }
+            /* sum up the foreign energy and dhdl terms for vv.  currently done every step so that dhdl is correct in the .edr */
+            sum_dhdl(enerd,state->lambda,ir->fepvals);
         }
         
         /* ########  END FIRST UPDATE STEP  ############## */
         /* ########  If doing VV, we now have v(dt) ###### */
-        
+        if (bDoExpanded) {
+            /* perform extended ensemble sampling in lambda - we don't
+               actually move to the new state before outputting
+               statistics, but if performing simulated tempering, we
+               do update the velocities and the tau_t. */
+
+            lamnew = ExpandedEnsembleDynamics(fplog,ir,enerd,state,&MassQ,&df_history,step,mcrng,state->v,mdatoms);
+        }
         /* ################## START TRAJECTORY OUTPUT ################# */
         
         /* Now we have the energies and forces corresponding to the 
@@ -1268,6 +1334,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                 {
                     get_stochd_state(upd,state);
                 }
+                if (state->flags  & (1<<estMC_RNG))
+                {
+                    get_mc_state(mcrng,state);
+                }
                 if (MASTER(cr))
                 {
                     if (bSumEkinhOld)
@@ -1280,6 +1350,14 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                         state_global->ekinstate.bUpToDate = TRUE;
                     }
                     update_energyhistory(&state_global->enerhist,mdebin);
+                    if (ir->efep!=efepNO || ir->bSimTemp) 
+                    {
+                        state_global->fep_state = state->fep_state; /* MRS: seems kludgy. The code should be
+                                                                       structured so this isn't necessary.
+                                                                       Note this reassignment is only necessary
+                                                                       for single threads.*/
+                        copy_df_history(&state_global->dfhist,&df_history);
+                    }
                 }
             }
             write_traj(fplog,cr,outf,mdof_flags,top_global,
@@ -1323,12 +1401,33 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         }
         /*  ################## END TRAJECTORY OUTPUT ################ */
         
+        /* Determine the pressure:
+         * always when we want exact averages in the energy file,
+         * at ns steps when we have pressure coupling,
+         * otherwise only at energy output steps (set below).
+         */
+
+        
+        bNstEner = (bGStatEveryStep || do_per_step(step,ir->nstcalcenergy));
+        bCalcEnerPres = bNstEner;
+
+        /* Do we need global communication ? */
+        bGStat = (bGStatEveryStep || bStopCM || bNS ||
+                  (ir->nstlist == -1 && !bRerunMD && step >= nlh.step_nscheck));
+
+        do_ene = (do_per_step(step,ir->nstenergy) || bLastStep);
+
+        if (do_ene || do_log)
+        {
+            bCalcEnerPres = TRUE;
+            bGStat        = TRUE;
+        }
+
         /* Determine the wallclock run time up till now */
         run_time = gmx_gettime() - (double)runtime->real;
-
         /* Check whether everything is still allright */    
         if (((int)gmx_get_stop_condition() > handled_stop_condition)
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
             && MASTER(cr)
 #endif
             )
@@ -1412,7 +1511,23 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         {
             gs.sig[eglsCHKPT] = 1;
         }
-  
+
+
+        /* at the start of step, randomize the velocities */
+        if (ETC_ANDERSEN(ir->etc) && EI_VV(ir->eI))
+        {
+            gmx_bool bDoAndersenConstr;
+            bDoAndersenConstr = update_randomize_velocities(ir,step,mdatoms,state,upd,&top->idef,constr);
+            /* if we have constraints, we have to remove the kinetic energy parallel to the bonds */
+            if (bDoAndersenConstr)
+            {
+                update_constraints(fplog,step,&dvdl,ir,ekind,mdatoms,state,graph,f,
+                                   &top->idef,tmp_vir,NULL,
+                                   cr,nrnb,wcycle,upd,constr,
+                                   bInitStep,TRUE,FALSE,vetanew);
+            }
+        }
+
         if (bIterations)
         {
             gmx_iterate_init(&iterate,bIterations);
@@ -1509,7 +1624,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                    cr,nrnb,wcycle,upd,constr,
                                    bInitStep,FALSE,bCalcEnerPres,state->veta);  
                 
-                if (ir->eI==eiVVAK) 
+                if (ir->eI==eiVVAK)
                 {
                     /* erase F_EKIN and F_TEMP here? */
                     /* just compute the kinetic energy at the half step to perform a trotter step */
@@ -1517,7 +1632,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                     wcycle,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
                                     constr,NULL,FALSE,lastbox,
                                     top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
-                                    cglo_flags | CGLO_TEMPERATURE    
+                                    cglo_flags | CGLO_TEMPERATURE
                         );
                     wallcycle_start(wcycle,ewcUPDATE);
                     trotter_update(ir,step,ekind,enerd,state,total_vir,mdatoms,&MassQ,trotter_seq,ettTSEQ4);            
@@ -1546,9 +1661,9 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                 
                 if (fr->bSepDVDL && fplog && do_log) 
                 {
-                    fprintf(fplog,sepdvdlformat,"Constraint",0.0,dvdl);
+                    fprintf(fplog,sepdvdlformat,"Constraint dV/dl",0.0,dvdl);
                 }
-                enerd->term[F_DHDL_CON] += dvdl;
+                enerd->term[F_DVDL_BONDED] += dvdl;
             } 
             else if (graph) 
             {
@@ -1582,6 +1697,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             {
                 gs.sig[eglsNABNSB] = nlh.nabnsb;
             }
+            bEnergyHere = (!EI_VV(ir->eI) || (EI_VV(ir->eI) && bRerunMD)); /* this is not quite working for vv and rerun! fails for running rerun on multiple threads. This is caught in runner.c. */
             compute_globals(fplog,gstat,cr,ir,fr,ekind,state,state_global,mdatoms,nrnb,vcm,
                             wcycle,enerd,force_vir,shake_vir,total_vir,pres,mu_tot,
                             constr,
@@ -1592,11 +1708,12 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                             top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
                             cglo_flags 
                             | (!EI_VV(ir->eI) ? CGLO_ENERGY : 0) 
+                            | (!EI_VV(ir->eI) && bStopCM ? CGLO_STOPCM : 0)
                             | (!EI_VV(ir->eI) ? CGLO_TEMPERATURE : 0) 
-                            | (!EI_VV(ir->eI) || bRerunMD ? CGLO_PRESSURE : 0) 
+                            | (bEnergyHere || bRerunMD ? CGLO_PRESSURE : 0) 
                             | (bIterations && iterate.bIterate ? CGLO_ITERATE : 0) 
                             | (bFirstIterate ? CGLO_FIRSTITERATE : 0)
-                            | CGLO_CONSTRAINT 
+                            | CGLO_CONSTRAINT
                 );
             if (ir->nstlist == -1 && bFirstIterate)
             {
@@ -1620,6 +1737,13 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             bFirstIterate = FALSE;
         }
 
+        /* only add constraint dvdl after constraints */
+        enerd->term[F_DVDL_BONDED] += dvdl;
+        if (!bVV)
+        {
+            /* sum up the foreign energy and dhdl terms for md and sd. currently done every step so that dhdl is correct in the .edr */
+            sum_dhdl(enerd,state->lambda,ir->fepvals);
+        }
         update_box(fplog,step,ir,mdatoms,state,graph,f,
                    ir->nstlist==-1 ? &nlh.scale_tot : NULL,pcoupl_mu,nrnb,wcycle,upd,bInitStep,FALSE);
         
@@ -1633,10 +1757,8 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                  f,NULL,xcopy,
                                  &(top_global->mols),mdatoms->massT,pres))
             {
-                if (gmx_parallel_env_initialized())
-                {
-                    gmx_finalize();
-                }
+                gmx_finalize_par();
+
                 fprintf(stderr,"\n");
                 exit(0);
             }
@@ -1670,9 +1792,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         }
 
         /* #########  BEGIN PREPARING EDR OUTPUT  ###########  */
-        
-        /* sum up the foreign energy and dhdl terms */
-        sum_dhdl(enerd,state->lambda,ir);
 
         /* use the directly determined last velocity, not actually the averaged half steps */
         if (bTrotter && ir->eI==eiVV) 
@@ -1716,12 +1835,19 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         {
             gmx_bool do_dr,do_or;
             
+            if (fplog && do_log && bDoExpanded)
+            {
+                /* only needed if doing expanded ensemble */
+                PrintFreeEnergyInfoToFile(fplog,ir->fepvals,ir->expandedvals,ir->bSimTemp?ir->simtempvals:NULL,
+                                          &df_history,state->fep_state,ir->nstlog,step);
+            }
             if (!(bStartingFromCpt && (EI_VV(ir->eI)))) 
             {
                 if (bNstEner)
                 {
-                    upd_mdebin(mdebin,bDoDHDL, TRUE,
-                               t,mdatoms->tmass,enerd,state,lastbox,
+                    upd_mdebin(mdebin,bDoDHDL,TRUE,
+                               t,mdatoms->tmass,enerd,state,
+                               ir->fepvals,ir->expandedvals,lastbox,
                                shake_vir,force_vir,total_vir,pres,
                                ekind,mu_tot,constr);
                 }
@@ -1746,12 +1872,19 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             {
                 if(fflush(fplog) != 0)
                 {
-                    gmx_fatal(FARGS,"Cannot flush logfile - maybe you are out of quota?");
+                    gmx_fatal(FARGS,"Cannot flush logfile - maybe you are out of disk space?");
                 }
             }
         }
-
-
+        if (bDoExpanded)
+        {
+            /* Have to do this part after outputting the logfile and the edr file */
+            state->fep_state = lamnew;
+            for (i=0;i<efptNR;i++)
+            {
+                state->lambda[i] = ir->fepvals->all_lambda[i][lamnew];
+            }
+        }
         /* Remaining runtime */
         if (MULTIMASTER(cr) && (do_verbose || gmx_got_usr_signal() ))
         {
@@ -1768,7 +1901,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             do_per_step(step,repl_ex_nst)) 
         {
             bExchanged = replica_exchange(fplog,cr,repl_ex,
-                                          state_global,enerd->term,
+                                          state_global,enerd,
                                           state,step,t);
 
             if (bExchanged && DOMAINDECOMP(cr)) 
@@ -1800,7 +1933,12 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         }
         
         /* #######  END SET VARIABLES FOR NEXT ITERATION ###### */
-        
+
+        if ( (membed!=NULL) && (!bLastStep) )
+        {
+            rescale_membed(step_rel,membed,state_global->x);
+        }
+
         if (bRerunMD) 
         {
             if (MASTER(cr))

@@ -44,11 +44,6 @@
 #include <signal.h>
 #include <stdlib.h>
 
-#if ((defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64) && !defined __CYGWIN__ && !defined __CYGWIN32__)
-/* _isnan() */
-#include <float.h>
-#endif
-
 #include "typedefs.h"
 #include "smalloc.h"
 #include "sysstuff.h"
@@ -59,8 +54,6 @@
 #include "names.h"
 #include "disre.h"
 #include "orires.h"
-#include "dihre.h"
-#include "pppm.h"
 #include "pme.h"
 #include "mdatoms.h"
 #include "repl_ex.h"
@@ -77,12 +70,15 @@
 #include "tpxio.h"
 #include "txtdump.h"
 #include "pull_rotation.h"
+#include "membed.h"
 #include "md_openmm.h"
+
+#include "gmx_omp.h"
 
 #ifdef GMX_LIB_MPI
 #include <mpi.h>
 #endif
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include "tmpi.h"
 #endif
 
@@ -92,10 +88,6 @@
 
 #ifdef GMX_OPENMM
 #include "md_openmm.h"
-#endif
-
-#ifdef GMX_OPENMP
-#include <omp.h>
 #endif
 
 
@@ -112,12 +104,12 @@ const gmx_intp_t integrator[eiNR] = { {do_md}, {do_steep}, {do_cg}, {do_md}, {do
 
 gmx_large_int_t     deform_init_init_step_tpx;
 matrix              deform_init_box_tpx;
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 tMPI_Thread_mutex_t deform_init_box_mutex=TMPI_THREAD_MUTEX_INITIALIZER;
 #endif
 
 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 struct mdrunner_arglist
 {
     FILE *fplog;
@@ -141,6 +133,7 @@ struct mdrunner_arglist
     int resetstep;
     int nmultisim;
     int repl_ex_nst;
+    int repl_ex_nex;
     int repl_ex_seed;
     real pforce;
     real cpt_period;
@@ -181,7 +174,7 @@ static void mdrunner_start_fn(void *arg)
                       mc.ddxyz, mc.dd_node_order, mc.rdd,
                       mc.rconstr, mc.dddlb_opt, mc.dlb_scale, 
                       mc.ddcsx, mc.ddcsy, mc.ddcsz, mc.nstepout, mc.resetstep, 
-                      mc.nmultisim, mc.repl_ex_nst, mc.repl_ex_seed, mc.pforce, 
+                      mc.nmultisim, mc.repl_ex_nst, mc.repl_ex_nex, mc.repl_ex_seed, mc.pforce,
                       mc.cpt_period, mc.max_hours, mc.deviceOptions,
                       mc.imdport, mc.imdfreq, mc.Flags);
 }
@@ -198,7 +191,7 @@ static t_commrec *mdrunner_start_threads(int nthreads,
               const char *dddlb_opt,real dlb_scale,
               const char *ddcsx,const char *ddcsy,const char *ddcsz,
               int nstepout,int resetstep,int nmultisim,int repl_ex_nst,
-              int repl_ex_seed, real pforce,real cpt_period, real max_hours, 
+              int repl_ex_nex, int repl_ex_seed, real pforce,real cpt_period, real max_hours,
               const char *deviceOptions, unsigned long Flags)
 {
     int ret;
@@ -238,6 +231,7 @@ static t_commrec *mdrunner_start_threads(int nthreads,
     mda->resetstep=resetstep;
     mda->nmultisim=nmultisim;
     mda->repl_ex_nst=repl_ex_nst;
+    mda->repl_ex_nex=repl_ex_nex;
     mda->repl_ex_seed=repl_ex_seed;
     mda->pforce=pforce;
     mda->cpt_period=cpt_period;
@@ -348,7 +342,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
              ivec ddxyz,int dd_node_order,real rdd,real rconstr,
              const char *dddlb_opt,real dlb_scale,
              const char *ddcsx,const char *ddcsy,const char *ddcsz,
-             int nstepout,int resetstep,int nmultisim,int repl_ex_nst,
+             int nstepout,int resetstep,int nmultisim, int repl_ex_nst, int repl_ex_nex,
              int repl_ex_seed, real pforce,real cpt_period,real max_hours,
              const char *deviceOptions, int imdport, int imdfreq, unsigned long Flags)
 {
@@ -380,6 +374,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
     t_commrec   *cr_old=cr; 
     int         nthreads_mpi=1;
     int         nthreads_pme=1;
+    gmx_membed_t membed=NULL;
 
     /* CAUTION: threads may be started later on in this function, so
        cr doesn't reflect the final parallel state right now */
@@ -403,7 +398,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
         read_tpx_state(ftp2fn(efTPX,nfile,fnm),inputrec,state,NULL,mtop);
 
         /* NOW the threads will be started: */
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         nthreads_mpi = get_nthreads_mpi(nthreads_requested, inputrec, mtop);
 
         if (nthreads_mpi > 1)
@@ -414,7 +409,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
                                       ddxyz, dd_node_order, rdd, rconstr, 
                                       dddlb_opt, dlb_scale, ddcsx, ddcsy, ddcsz,
                                       nstepout, resetstep, nmultisim, 
-                                      repl_ex_nst, repl_ex_seed, pforce, 
+                                      repl_ex_nst, repl_ex_nex, repl_ex_seed, pforce,
                                       cpt_period, max_hours, deviceOptions, 
                                       Flags);
             /* the main thread continues here with a new cr. We don't deallocate
@@ -427,6 +422,18 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
 #endif
     }
     /* END OF CAUTION: cr is now reliable */
+
+    /* g_membed initialisation *
+     * Because we change the mtop, init_membed is called before the init_parallel *
+     * (in case we ever want to make it run in parallel) */
+    if (opt2bSet("-membed",nfile,fnm))
+    {
+        if (MASTER(cr))
+        {
+            fprintf(stderr,"Initializing membed");
+        }
+        membed = init_membed(fplog,nfile,fnm,mtop,inputrec,state,cr,&cpt_period);
+    }
 
     if (PAR(cr))
     {
@@ -441,6 +448,13 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
     /* now make sure the state is initialized and propagated */
     set_state_entries(state,inputrec,cr->nnodes);
 
+    /* remove when vv and rerun works correctly! */
+    if (PAR(cr) && EI_VV(inputrec->eI) && ((Flags & MD_RERUN) || (Flags & MD_RERUN_VSITE)))
+    {
+        gmx_fatal(FARGS,
+                  "Currently can't do velocity verlet with rerun in parallel.");
+    }
+
     /* A parallel command line option consistency check that we can
        only do after any threads have started. */
     if (!PAR(cr) &&
@@ -451,7 +465,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
 #ifndef GMX_MPI
                   "but mdrun was compiled without threads or MPI enabled"
 #else
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
                   "but the number of threads (option -nt) is 1"
 #else
                   "but mdrun was not started through mpirun/mpiexec or only one process was requested through mpirun/mpiexec" 
@@ -474,6 +488,20 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
 
     if (!EEL_PME(inputrec->coulombtype) || (Flags & MD_PARTDEC))
     {
+        if (cr->npmenodes > 0)
+        {
+            if (!EEL_PME(inputrec->coulombtype))
+            {
+                gmx_fatal_collective(FARGS,cr,NULL,
+                                     "PME nodes are requested, but the system does not use PME electrostatics");
+            }
+            if (Flags & MD_PARTDEC)
+            {
+                gmx_fatal_collective(FARGS,cr,NULL,
+                                     "PME nodes are requested, but particle decomposition does not support separate PME nodes");
+            }
+        }
+
         cr->npmenodes = 0;
     }
 
@@ -524,12 +552,12 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
          * This should be thread safe, since they are only written once
          * and with identical values.
          */
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         tMPI_Thread_mutex_lock(&deform_init_box_mutex);
 #endif
         deform_init_init_step_tpx = inputrec->init_step;
         copy_mat(box,deform_init_box_tpx);
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         tMPI_Thread_mutex_unlock(&deform_init_box_mutex);
 #endif
     }
@@ -544,7 +572,8 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
             load_checkpoint(opt2fn_master("-cpi",nfile,fnm,cr),&fplog,
                             cr,Flags & MD_PARTDEC,ddxyz,
                             inputrec,state,&bReadRNG,&bReadEkin,
-                            (Flags & MD_APPENDFILES));
+                            (Flags & MD_APPENDFILES),
+                            (Flags & MD_APPENDFILESSET));
             
             if (bReadRNG)
             {
@@ -558,7 +587,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
     }
 
     if (((MASTER(cr) || (Flags & MD_SEPPOT)) && (Flags & MD_APPENDFILES))
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
         /* With thread MPI only the master node/thread exists in mdrun.c,
          * therefore non-master nodes need to open the "seppot" log file here.
          */
@@ -689,12 +718,6 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
             }
         }
 
-        /* Dihedral Restraints */
-        if (gmx_mtop_ftype_count(mtop,F_DIHRES) > 0)
-        {
-            init_dihres(fplog,mtop,inputrec,fcd);
-        }
-
         /* Initiate forcerecord */
         fr = mk_forcerec();
         init_forcerec(fplog,oenv,fr,fcd,inputrec,mtop,cr,box,FALSE,
@@ -744,22 +767,6 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
                  * and for the initial shell prediction.
                  */
                 construct_vsites_mtop(fplog,vsite,mtop,state->x);
-            }
-        }
-
-        /* Initiate PPPM if necessary */
-        if (fr->eeltype == eelPPPM)
-        {
-            if (mdatoms->nChargePerturbed)
-            {
-                gmx_fatal(FARGS,"Free energy with %s is not implemented",
-                          eel_names[fr->eeltype]);
-            }
-            status = gmx_pppm_init(fplog,cr,oenv,FALSE,TRUE,box,
-                                   getenv("GMXGHAT"),inputrec, (Flags & MD_REPRODUCIBLE));
-            if (status != 0)
-            {
-                gmx_fatal(FARGS,"Error %d initializing PPPM",status);
             }
         }
 
@@ -823,7 +830,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
             {
                 cpu_set_t mask;
                 CPU_ZERO(&mask);
-                core+=omp_get_thread_num();
+                core+=gmx_omp_get_thread_num();
                 CPU_SET(core,&mask);
                 sched_setaffinity((pid_t) syscall (SYS_gettid),sizeof(cpu_set_t),&mask);
             }
@@ -865,14 +872,14 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
         if (inputrec->ePull != epullNO)
         {
             /* Initialize pull code */
-            init_pull(fplog,inputrec,nfile,fnm,mtop,cr,oenv,
+            init_pull(fplog,inputrec,nfile,fnm,mtop,cr,oenv, inputrec->fepvals->init_lambda,
                       EI_DYNAMICS(inputrec->eI) && MASTER(cr),Flags);
         }
         
         if (inputrec->bRot)
         {
            /* Initialize enforced rotation code */
-           init_rot(fplog,inputrec,nfile,fnm,cr,state->x,state->box,mtop,oenv,
+           init_rot(fplog,inputrec,nfile,fnm,cr,state->x,box,mtop,oenv,
                     bVerbose,Flags);
         }
 
@@ -896,7 +903,8 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
                                       nstepout,inputrec,mtop,
                                       fcd,state,
                                       mdatoms,nrnb,wcycle,ed,fr,
-                                      repl_ex_nst,repl_ex_seed,
+                                      repl_ex_nst,repl_ex_nex,repl_ex_seed,
+                                      membed,
                                       cpt_period,max_hours,
                                       deviceOptions,
                                       imdport,imdfreq,
@@ -945,6 +953,11 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
                inputrec,nrnb,wcycle,&runtime,
                EI_DYNAMICS(inputrec->eI) && !MULTISIM(cr));
 
+    if (opt2bSet("-membed",nfile,fnm))
+    {
+        sfree(membed);
+    }
+
     /* Does what it says */  
     print_date_and_time(fplog,cr->nodeid,"Finished mdrun",&runtime);
 
@@ -956,7 +969,7 @@ int mdrunner(int nthreads_requested, FILE *fplog,t_commrec *cr,int nfile,
 
     rc=(int)gmx_get_stop_condition();
 
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
     /* we need to join all threads. The sub-threads join when they
        exit this function, but the master thread needs to be told to 
        wait for that. */

@@ -61,7 +61,7 @@
 #include "qmmm.h"
 #include "copyrite.h"
 #include "mtop_util.h"
-
+#include "gmx_detectcpu.h"
 
 #ifdef _MSC_VER
 /* MSVC definition for __cpuid() */
@@ -860,7 +860,7 @@ void set_avcsixtwelve(FILE *fplog,t_forcerec *fr,const gmx_mtop_t *mtop)
                                 tpj = atoms->atom[k].typeB;
                             }
                             if (bBHAM) {
-                                csix -= nmol*BHAMC(nbfp,ntp,tpi,tpj);
+                               csix -= nmol*BHAMC(nbfp,ntp,tpi,tpj);
                             } else {
                                 csix    -= nmol*C6 (nbfp,ntp,tpi,tpj);
                                 ctwelve -= nmol*C12(nbfp,ntp,tpi,tpj);
@@ -1022,7 +1022,6 @@ static void make_nbf_tables(FILE *fp,const output_env_t oenv,
 {
   char buf[STRLEN];
   int i,j;
-  void *      p_tmp;
 
   if (tabfn == NULL) {
     if (debug)
@@ -1041,25 +1040,11 @@ static void make_nbf_tables(FILE *fp,const output_env_t oenv,
    */
 
   /* For performance reasons we want
-   * the table data to be aligned to 16-byte. This is accomplished
-   * by allocating 16 bytes extra to a temporary pointer, and then
-   * calculating an aligned pointer. This new pointer must not be
-   * used in a free() call, but thankfully we're sloppy enough not
-   * to do this...
+   * the table data to be aligned to 16-byte. The pointer could be freed
+   * but currently isn't.
    */
-  
-  /* 8 fp entries per vdw table point, n+1 points, and 16 bytes extra to align it. */
-  p_tmp = malloc(8*(nbl->tab.n+1)*sizeof(real)+16);
-  
-  /* align it - size_t has the same same as a pointer */
-  nbl->vdwtab = (real *) (((size_t) p_tmp + 16) & (~((size_t) 15)));  
-
-  /* 4 fp entries per coul table point, n+1 points, and 16 bytes extra to align it. */
-  p_tmp = malloc(4*(nbl->tab.n+1)*sizeof(real)+16);
-  
-  /* align it - size_t has the same same as a pointer */
-  nbl->coultab = (real *) (((size_t) p_tmp + 16) & (~((size_t) 15)));  
-
+  snew_aligned(nbl->vdwtab,8*(nbl->tab.n+1),16);
+  snew_aligned(nbl->coultab,4*(nbl->tab.n+1),16);
   
   for(i=0; i<=nbl->tab.n; i++) {
     for(j=0; j<4; j++)
@@ -1255,56 +1240,6 @@ gmx_bool can_use_allvsall(const t_inputrec *ir, const gmx_mtop_t *mtop,
 }
 
 
-/* Return 1 if SSE2 support is present, otherwise 0. */
-static int 
-forcerec_check_sse2()
-{
-#if ( defined(GMX_IA32_SSE2) || defined(GMX_X86_64_SSE2) || defined(GMX_IA32_SSE) || defined(GMX_X86_64_SSE)|| defined(GMX_SSE2) )
-	unsigned int level;
-	unsigned int _eax,_ebx,_ecx,_edx;
-	int status;
-	int CPUInfo[4];
-	
-	level = 1;
-#ifdef _MSC_VER
-	__cpuid(CPUInfo,1);
-	
-	_eax=CPUInfo[0];
-	_ebx=CPUInfo[1];
-	_ecx=CPUInfo[2];
-	_edx=CPUInfo[3];
-	
-#elif defined(__x86_64__)
-	/* GCC 64-bit inline asm */
-	__asm__ ("push %%rbx\n\tcpuid\n\tpop %%rbx\n"                 \
-			 : "=a" (_eax), "=S" (_ebx), "=c" (_ecx), "=d" (_edx) \
-			 : "0" (level));
-#elif defined(__i386__)
-	__asm__ ("push %%ebx\n\tcpuid\n\tpop %%ebx\n"                 \
-			 : "=a" (_eax), "=S" (_ebx), "=c" (_ecx), "=d" (_edx) \
-			 : "0" (level));
-#else
-	_eax=_ebx=_ecx=_edx=0;
-#endif
-    
-	/* Features:                                                                                                       
-	 *                                                                                                                 
-	 * SSE      Bit 25 of edx should be set                                                                            
-	 * SSE2     Bit 26 of edx should be set                                                                            
-	 * SSE3     Bit  0 of ecx should be set                                                                            
-	 * SSE4.1   Bit 19 of ecx should be set                                                                            
-	 */
-	status =  (_edx & (1 << 26)) != 0;
-    
-#else
-        int status = 0;
-#endif
-	/* Return SSE2 status */
-	return status;
-}
-
-
-
 
 void init_forcerec(FILE *fp,
                    const output_env_t oenv,
@@ -1333,6 +1268,16 @@ void init_forcerec(FILE *fp,
     t_nblists *nbl;
     int     *nm_ind,egp_flags;
     
+    gmx_detectcpu(&fr->cpu_information);
+    if(MASTER(cr))
+    {
+        /* Only print warnings from master */
+        gmx_detectcpu_check_acceleration(fr->cpu_information,fp);
+    }
+
+    /* By default we turn acceleration on, but it might be turned off further down... */
+    fr->use_acceleration = TRUE;
+
     fr->bDomDec = DOMAINDECOMP(cr);
 
     natoms = mtop->natoms;
@@ -1382,6 +1327,7 @@ void init_forcerec(FILE *fp,
       copy_rvec(ir->adress->refs,fr->adress_refs);
     } else {
       fr->adress_type = eAdressOff;
+      fr->adress_do_hybridpairs = FALSE;
     }
     
     /* Copy the user determined parameters */
@@ -1398,11 +1344,22 @@ void init_forcerec(FILE *fp,
     fr->fc_stepsize = ir->fc_stepsize;
     
     /* Free energy */
-    fr->efep          = ir->efep;
-    fr->sc_alpha      = ir->sc_alpha;
-    fr->sc_power      = ir->sc_power;
-    fr->sc_sigma6_def = pow(ir->sc_sigma,6);
-    fr->sc_sigma6_min = pow(ir->sc_sigma_min,6);
+    fr->efep       = ir->efep;
+    fr->sc_alphavdw = ir->fepvals->sc_alpha;
+    if (ir->fepvals->bScCoul)
+    {
+        fr->sc_alphacoul = ir->fepvals->sc_alpha;
+        fr->sc_sigma6_min = pow(ir->fepvals->sc_sigma_min,6);
+    }
+    else
+    {
+        fr->sc_alphacoul = 0;
+        fr->sc_sigma6_min = 0; /* only needed when bScCoul is on */
+    }
+    fr->sc_power   = ir->fepvals->sc_power;
+    fr->sc_r_power   = ir->fepvals->sc_r_power;
+    fr->sc_sigma6_def = pow(ir->fepvals->sc_sigma,6);
+
     env = getenv("GMX_SCSIGMA_MIN");
     if (env != NULL)
     {
@@ -1428,21 +1385,17 @@ void init_forcerec(FILE *fp,
         bNoSolvOpt         = TRUE;
     }
     
-    fr->UseOptimizedKernels = (getenv("GMX_NOOPTIMIZEDKERNELS") == NULL);
-    if(fp && fr->UseOptimizedKernels==FALSE)
+    if( (getenv("GMX_DISABLE_ACCELERATION") != NULL) || (getenv("GMX_NOOPTIMIZEDKERNELS") != NULL) )
     {
-        fprintf(fp,
-                "\nFound environment variable GMX_NOOPTIMIZEDKERNELS.\n"
-                "Disabling SSE/SSE2/Altivec/ia64/Power6/Bluegene specific kernels.\n\n");
-    }    
-
-#if ( defined(GMX_IA32_SSE2) || defined(GMX_X86_64_SSE2) || defined(GMX_IA32_SSE) || defined(GMX_X86_64_SSE)|| defined(GMX_SSE2) )
-    if( forcerec_check_sse2() == 0 )
-    {
-        fr->UseOptimizedKernels = FALSE;
+        fr->use_acceleration = FALSE;
+        if (fp != NULL)
+        {
+            fprintf(fp,
+                    "\nFound environment variable GMX_DISABLE_ACCELERATION.\n"
+                    "Disabling all architecture-specific (e.g. SSE2/SSE4/AVX) routines.\n\n");
+        }
     }
-#endif
-    
+
     /* Check if we can/should do all-vs-all kernels */
     fr->bAllvsAll       = can_use_allvsall(ir,mtop,FALSE,NULL,NULL);
     fr->AllvsAll_work   = NULL;
@@ -1489,7 +1442,15 @@ void init_forcerec(FILE *fp,
         {
             if (fp)
                 fprintf(fp,"Will do PME sum in reciprocal space.\n");
-            please_cite(fp,"Essmann95a");
+            if (ir->coulombtype == eelP3M_AD)
+            {
+                please_cite(fp,"Hockney1988");
+                please_cite(fp,"Ballenegger2012");
+            }
+            else
+            {
+                please_cite(fp,"Essmann95a");
+            }
             
             if (ir->ewald_geometry == eewg3DC)
             {
@@ -1524,27 +1485,12 @@ void init_forcerec(FILE *fp,
     {
         init_generalized_rf(fp,mtop,ir,fr);
     }
-    else if (EEL_FULL(fr->eeltype) || (fr->eeltype == eelSHIFT) || 
-             (fr->eeltype == eelUSER) || (fr->eeltype == eelSWITCH))
+    else if (fr->eeltype == eelSHIFT)
     {
-        /* We must use the long range cut-off for neighboursearching...
-         * An extra range of e.g. 0.1 nm (half the size of a charge group)
-         * is necessary for neighboursearching. This allows diffusion 
-         * into the cut-off range (between neighborlist updates), 
-         * and gives more accurate forces because all atoms within the short-range
-         * cut-off rc must be taken into account, while the ns criterium takes
-         * only those with the center of geometry within the cut-off.
-         * (therefore we have to add half the size of a charge group, plus
-         * something to account for diffusion if we have nstlist > 1)
-         */
         for(m=0; (m<DIM); m++)
             box_size[m]=box[m][m];
         
-        if (fr->eeltype == eelPPPM && fr->phi == NULL)
-            snew(fr->phi,natoms);
-        
-        if ((fr->eeltype==eelPPPM) || (fr->eeltype==eelPOISSON) || 
-            (fr->eeltype == eelSHIFT && fr->rcoulomb > fr->rcoulomb_switch))
+        if ((fr->eeltype == eelSHIFT && fr->rcoulomb > fr->rcoulomb_switch))
             set_shift_consts(fp,fr->rcoulomb_switch,fr->rcoulomb,box_size,fr);
     }
     
@@ -1852,7 +1798,7 @@ void init_forcerec(FILE *fp,
     init_ns(fp,cr,&fr->ns,fr,mtop,box);
     
     if (cr->duty & DUTY_PP){
-        gmx_setup_kernels(fp,bGenericKernelOnly);
+        gmx_setup_kernels(fp,fr,bGenericKernelOnly);
         if (ir->bAdress)
             gmx_setup_adress_kernels(fp,bGenericKernelOnly);
     }

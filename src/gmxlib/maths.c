@@ -89,7 +89,7 @@ real sign(real x,real y)
  * ====================================================
  */
 
-#if (INT_MAX == 2147483647)
+#if ( (defined SIZEOF_INT && SIZEOF_INT==4) || (SIZEOF_INT_MAX == 2147483647) )
    typedef int erf_int32_t;
    typedef unsigned int erf_u_int32_t;
 #elif (LONG_MAX == 2147483647L)
@@ -195,7 +195,9 @@ double gmx_erf(double x)
     
     conv.d=x;
     
-#ifdef IEEE754_BIG_ENDIAN_WORD_ORDER  
+        /* In release-4-6 and later branches, only the test for
+         * GMX_IEEE754_BIG_ENDIAN_WORD_ORDER will be required. */
+#if defined(IEEE754_BIG_ENDIAN_WORD_ORDER) || defined(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER)
     hx=conv.i[0];
 #else
     hx=conv.i[1];
@@ -255,7 +257,9 @@ double gmx_erf(double x)
 
     conv.d = x;
 
-#ifdef IEEE754_BIG_ENDIAN_WORD_ORDER  
+        /* In release-4-6 and later branches, only the test for
+         * GMX_IEEE754_BIG_ENDIAN_WORD_ORDER will be required. */
+#if defined(IEEE754_BIG_ENDIAN_WORD_ORDER) || defined(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER)
     conv.i[1] = 0;
 #else
     conv.i[0] = 0;
@@ -285,7 +289,9 @@ double gmx_erfc(double x)
     
     conv.d = x;
     
-#ifdef IEEE754_BIG_ENDIAN_WORD_ORDER  
+        /* In release-4-6 and later branches, only the test for
+         * GMX_IEEE754_BIG_ENDIAN_WORD_ORDER will be required. */
+#if defined(IEEE754_BIG_ENDIAN_WORD_ORDER) || defined(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER)
     hx=conv.i[0];
 #else
     hx=conv.i[1];
@@ -356,7 +362,9 @@ double gmx_erfc(double x)
 
         conv.d = x;
 
-#ifdef IEEE754_BIG_ENDIAN_WORD_ORDER  
+        /* In release-4-6 and later branches, only the test for
+         * GMX_IEEE754_BIG_ENDIAN_WORD_ORDER will be required. */
+#if defined(IEEE754_BIG_ENDIAN_WORD_ORDER) || defined(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER)
         conv.i[1] = 0;
 #else
         conv.i[0] = 0;
@@ -641,28 +649,6 @@ float gmx_erfc(float x)
 
 #endif
 
-float fast_float_erf(float x)
-{
-	float t,ans;
-
-	t=1.0/(1.0+0.5*x);
-	ans=t*exp(-x*x-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+
-		t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+
-		t*(-0.82215223+t*0.17087277)))))))));
-	return 1.0-ans;
-}
-
-float fast_float_erfc(float x)
-{
-	float t,ans;
-
-	t=1.0/(1.0+0.5*x);
-	ans=t*exp(-x*x-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+
-		t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+
-		t*(-0.82215223+t*0.17087277)))))))));
-	return ans;
-}
-
 gmx_bool gmx_isfinite(real x)
 {
     gmx_bool returnval = TRUE;
@@ -677,4 +663,34 @@ gmx_bool gmx_isfinite(real x)
     returnval = _finite(x);
 #endif
     return returnval;
+}
+
+gmx_bool
+check_int_multiply_for_overflow(gmx_large_int_t a,
+                                gmx_large_int_t b,
+                                gmx_large_int_t *result)
+{
+    gmx_large_int_t sign = 1;
+    if((0 == a) || (0 == b))
+    {
+        *result = 0;
+        return TRUE;
+    }
+    if(a < 0)
+    {
+        a = -a;
+        sign = -sign;
+    }
+    if(b < 0)
+    {
+        b = -b;
+        sign = -sign;
+    }
+    if(GMX_LARGE_INT_MAX / b < a)
+    {
+        *result = (sign > 0) ? GMX_LARGE_INT_MAX : GMX_LARGE_INT_MIN;
+        return FALSE;
+    }
+    *result = sign * a * b;
+    return TRUE;
 }

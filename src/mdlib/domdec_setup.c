@@ -21,6 +21,7 @@
 #endif
 
 #include <stdio.h>
+#include <assert.h>
 #include "domdec.h"
 #include "network.h"
 #include "perf_est.h"
@@ -318,6 +319,8 @@ static float comm_cost_est(gmx_domdec_t *dd,real limit,real cutoff,
     {
         return -1;
     }
+
+    assert(ddbox->npbcdim<=DIM);
 
     /* Check if the triclinic requirements are met */
     for(i=0; i<DIM; i++)
@@ -661,7 +664,7 @@ real dd_choose_grid(FILE *fplog,
                     real cellsize_limit,real cutoff_dd,
                     gmx_bool bInterCGBondeds,gmx_bool bInterCGMultiBody)
 {
-    int  nnodes_div,ldiv;
+    gmx_large_int_t nnodes_div,ldiv;
     real limit;
     
     if (MASTER(cr))
@@ -709,18 +712,30 @@ real dd_choose_grid(FILE *fplog,
         {
             if (cr->npmenodes < 0)
             {
-                if (cr->nnodes <= 10)
+                /* Use PME nodes when the number of nodes is more than 16 */
+                if (cr->nnodes <= 18)
                 {
                     cr->npmenodes = 0;
+                    if (fplog)
+                    {
+                        fprintf(fplog,"Using %d separate PME nodes, as there are too few total\n nodes for efficient splitting\n",cr->npmenodes);
+                    }
                 }
                 else
                 {
                     cr->npmenodes = guess_npme(fplog,mtop,ir,box,cr->nnodes);
+                    if (fplog)
+                    {
+                        fprintf(fplog,"Using %d separate PME nodes, as guessed by mdrun\n",cr->npmenodes);
+                    }
                 }
             }
-            if (fplog)
+            else
             {
-                fprintf(fplog,"Using %d separate PME nodes\n",cr->npmenodes);
+                if (fplog)
+                {
+                    fprintf(fplog,"Using %d separate PME nodes, per user request\n",cr->npmenodes);
+                }
             }
         }
         

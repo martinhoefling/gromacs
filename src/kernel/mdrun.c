@@ -49,7 +49,7 @@
 #include "mdrun.h"
 #include "xmdrun.h"
 #include "checkpoint.h"
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
 #include "thread_mpi.h"
 #endif
 
@@ -291,6 +291,11 @@ int main(int argc,char *argv[])
     "appropriate options have been given. Currently under",
     "investigation are: polarizability and X-ray bombardments.",
     "[PAR]",
+    "The option [TT]-membed[tt] does what used to be g_membed, i.e. embed",
+    "a protein into a membrane. The data file should contain the options",
+    "that where passed to g_membed before. The [TT]-mn[tt] and [TT]-mp[tt]",
+    "both apply to this as well.",
+    "[PAR]",
     "The option [TT]-pforce[tt] is useful when you suspect a simulation",
     "crashes due to too large forces. With this option coordinates and",
     "forces of atoms with a force larger than a certain value will",
@@ -396,7 +401,10 @@ int main(int argc,char *argv[])
     { efLOG, "-rt",     "rottorque",ffOPTWR },
     { efMTX, "-mtx",    "nm",       ffOPTWR },
     { efNDX, "-dn",     "dipole",   ffOPTWR },
-    { efRND, "-multidir",NULL,      ffOPTRDMULT}
+    { efRND, "-multidir",NULL,      ffOPTRDMULT},
+    { efDAT, "-membed", "membed",   ffOPTRD },
+    { efTOP, "-mp",     "membed",   ffOPTRD },
+    { efNDX, "-mn",     "membed",   ffOPTRD }
   };
 #define NFILE asize(fnm)
 
@@ -422,6 +430,7 @@ int main(int argc,char *argv[])
   int  nstglobalcomm=-1;
   int  repl_ex_nst=0;
   int  repl_ex_seed=-1;
+  int  repl_ex_nex=0;
   int  nstepout=100;
   int  nthreads=0; /* set to determine # of threads automatically */
   int  resetstep=-1;
@@ -448,7 +457,7 @@ int main(int argc,char *argv[])
       "Use particle decompostion" },
     { "-dd",      FALSE, etRVEC,{&realddxyz},
       "Domain decomposition grid, 0 is optimize" },
-#ifdef GMX_THREADS
+#ifdef GMX_THREAD_MPI
     { "-nt",      FALSE, etINT, {&nthreads},
       "Number of threads to start (0 is guess)" },
 #endif
@@ -497,7 +506,9 @@ int main(int argc,char *argv[])
     { "-multi",   FALSE, etINT,{&nmultisim}, 
       "Do multiple simulations in parallel" },
     { "-replex",  FALSE, etINT, {&repl_ex_nst}, 
-      "Attempt replica exchange every # steps" },
+      "Attempt replica exchange periodically with this period (steps)" },
+    { "-nex",  FALSE, etINT, {&repl_ex_nex},
+      "Number of random exchanges to carry out each exchange interval (N^3 is one suggestion).  -nex zero or not specified gives neighbor replica exchange." },
     { "-reseed",  FALSE, etINT, {&repl_ex_seed}, 
       "Seed for replica exchange, -1 is generate a seed" },
     { "-rerunvsite", FALSE, etBOOL, {&bRerunVSite},
@@ -548,8 +559,7 @@ int main(int argc,char *argv[])
   if (MASTER(cr))
     CopyRight(stderr, argv[0]);
 
-  PCA_Flags = (PCA_KEEP_ARGS | PCA_NOEXIT_ON_ARGS | PCA_CAN_SET_DEFFNM
-	       | (MASTER(cr) ? 0 : PCA_QUIET));
+  PCA_Flags = (PCA_CAN_SET_DEFFNM | (MASTER(cr) ? 0 : PCA_QUIET));
   
 
   /* Comment this in to do fexist calls only on master
@@ -576,7 +586,7 @@ int main(int argc,char *argv[])
   dd_node_order = nenum(ddno_opt);
   cr->npmenodes = npme;
 
-#ifndef GMX_THREADS
+#ifndef GMX_THREAD_MPI
   nthreads=1;
 #endif
 
@@ -604,6 +614,9 @@ int main(int argc,char *argv[])
 
   if (repl_ex_nst != 0 && nmultisim < 2)
       gmx_fatal(FARGS,"Need at least two replicas for replica exchange (option -multi)");
+
+  if (repl_ex_nex < 0)
+      gmx_fatal(FARGS,"Replica exchange number of exchanges needs to be positive");
 
   if (nmultisim > 1) {
 #ifndef GMX_THREADS
@@ -679,6 +692,7 @@ int main(int argc,char *argv[])
   Flags = Flags | (bRerunVSite   ? MD_RERUN_VSITE  : 0);
   Flags = Flags | (bReproducible ? MD_REPRODUCIBLE : 0);
   Flags = Flags | (bAppendFiles  ? MD_APPENDFILES  : 0); 
+  Flags = Flags | (opt2parg_bSet("-append", asize(pa),pa) ? MD_APPENDFILESSET : 0); 
   Flags = Flags | (bKeepAndNumCPT ? MD_KEEPANDNUMCPT : 0); 
   Flags = Flags | (sim_part>1    ? MD_STARTFROMCPT : 0); 
   Flags = Flags | (bResetCountersHalfWay ? MD_RESETCOUNTERSHALFWAY : 0);
@@ -714,11 +728,10 @@ int main(int argc,char *argv[])
   rc = mdrunner(nthreads, fplog,cr,NFILE,fnm,oenv,bVerbose,bCompact,
                 nstglobalcomm, ddxyz,dd_node_order,rdd,rconstr,
                 dddlb_opt[0],dlb_scale,ddcsx,ddcsy,ddcsz,
-                nstepout,resetstep,nmultisim,repl_ex_nst,repl_ex_seed,
+                nstepout,resetstep,nmultisim,repl_ex_nst,repl_ex_nex,repl_ex_seed,
                 pforce, cpt_period,max_hours,deviceOptions,imdport,imdfreq,Flags);
 
-  if (gmx_parallel_env_initialized())
-      gmx_finalize();
+  gmx_finalize_par();
 
   if (MULTIMASTER(cr)) {
       thanx(stderr);
