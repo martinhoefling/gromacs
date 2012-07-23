@@ -57,7 +57,13 @@
 #include "refdata.h"
 #include "testexceptions.h"
 
-static boost::scoped_ptr<std::vector<std::string> > s_commandLine;
+namespace
+{
+
+//! Stored command line for gmx::test::parseTestOptions().
+boost::scoped_ptr<std::vector<std::string> > s_commandLine;
+
+} // namespace
 
 namespace gmx
 {
@@ -83,9 +89,9 @@ void initTestUtils(const char *dataPath, int *argc, char *argv[])
         }
         swap(commandLine, s_commandLine);
     }
-    catch (const std::bad_alloc &)
+    catch (const std::exception &ex)
     {
-        std::fprintf(stderr, "Out of memory\n");
+        printFatalErrorMessage(stderr, ex);
         std::exit(1);
     }
     ::gmx::setFatalErrorHandler(NULL);

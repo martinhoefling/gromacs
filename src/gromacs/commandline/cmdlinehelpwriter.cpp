@@ -48,9 +48,7 @@
 #include "gromacs/selection/selectionfileoptioninfo.h"
 #include "gromacs/selection/selectionoptioninfo.h"
 #include "gromacs/utility/file.h"
-#include "gromacs/utility/format.h"
-
-#include "cmdlinehelpwriter-impl.h"
+#include "gromacs/utility/stringutil.h"
 
 namespace gmx
 {
@@ -152,7 +150,8 @@ void FileParameterWriter::visitOptionType(const FileNameOptionInfo &option)
     for (int i = 0; i < option.valueCount() || i == 0; ++i)
     {
         std::string value;
-        if (option.valueCount() == 0)
+        if (option.valueCount() == 0
+            || (option.valueCount() == 1 && option.formatValue(0).empty()))
         {
             value = option.formatDefaultValueIfSet();
         }
@@ -389,6 +388,27 @@ void SelectionParameterWriter::visitOption(const OptionInfo &option)
 /********************************************************************
  * CommandLineHelpWriter::Impl
  */
+
+/*! \internal \brief
+ * Private implementation class for CommandLineHelpWriter.
+ *
+ * \ingroup module_commandline
+ */
+class CommandLineHelpWriter::Impl
+{
+    public:
+        //! Sets the Options object to use for generating help.
+        explicit Impl(const Options &options);
+
+        //! Options object to use for generating help.
+        const Options          &options_;
+        //! Time unit to show in descriptions.
+        std::string             timeUnit_;
+        //! Whether to write descriptions to output.
+        bool                    bShowDescriptions_;
+        //! Whether to write hidden options to output.
+        bool                    bShowHidden_;
+};
 
 CommandLineHelpWriter::Impl::Impl(const Options &options)
     : options_(options), timeUnit_(TimeUnitManager().timeUnitAsString()),

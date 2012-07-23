@@ -45,9 +45,11 @@
 #include <string>
 #include <vector>
 
+#include "gromacs/legacyheaders/futil.h"
+
 #include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/gmxassert.h"
-#include "gromacs/utility/format.h"
+#include "gromacs/utility/stringutil.h"
 
 namespace gmx
 {
@@ -182,6 +184,32 @@ void File::readBytes(void *buffer, size_t bytes)
     }
 }
 
+bool File::readLine(std::string *line)
+{
+    line->clear();
+    const size_t bufsize = 256;
+    std::string result;
+    char buf[bufsize];
+    buf[0] = '\0';
+    FILE *fp = handle();
+    while (fgets(buf, bufsize, fp) != NULL)
+    {
+        size_t length = std::strlen(buf);
+        result.append(buf, length);
+        if (length < bufsize - 1 || buf[length - 1] == '\n')
+        {
+            break;
+        }
+    }
+    if (ferror(fp))
+    {
+        GMX_THROW_WITH_ERRNO(FileIOError("Error while reading file"),
+                             "fgets", errno);
+    }
+    *line = result;
+    return !result.empty() || !feof(fp);
+}
+
 void File::writeString(const char *str)
 {
     if (fprintf(handle(), "%s", str) < 0)
@@ -205,6 +233,25 @@ void File::writeLine(const char *line)
 void File::writeLine()
 {
     writeString("\n");
+}
+
+// static
+bool File::exists(const char *filename)
+{
+    return gmx_fexist(filename);
+}
+
+// static
+bool File::exists(const std::string &filename)
+{
+    return exists(filename.c_str());
+}
+
+// static
+File &File::standardInput()
+{
+    static File stdinObject(stdin, false);
+    return stdinObject;
 }
 
 // static
@@ -262,6 +309,14 @@ std::string File::readToString(const char *filename)
 std::string File::readToString(const std::string &filename)
 {
     return readToString(filename.c_str());
+}
+
+// static
+void File::writeFileFromString(const std::string &filename,
+                               const std::string &text)
+{
+    File file(filename, "w");
+    file.writeString(text);
 }
 
 } // namespace gmx

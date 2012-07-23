@@ -126,21 +126,6 @@ class SelectionCollection::Impl
          */
         void clearSymbolTable();
         /*! \brief
-         * Helper function that runs the parser once the tokenizer has been
-         * initialized.
-         *
-         * \param[in,out] scanner Scanner data structure.
-         * \param[in]     maxnr   Maximum number of selections to parse
-         *      (if -1, parse as many as provided by the user).
-         * \returns       Vector of parsed selections.
-         * \throws        std::bad_alloc if out of memory.
-         * \throws        InvalidInputError if there is a parsing error.
-         *
-         * Used internally to implement parseFromStdin(), parseFromFile() and
-         * parseFromString().
-         */
-        SelectionList runParser(void *scanner, int maxnr);
-        /*! \brief
          * Replace group references by group contents.
          *
          * \param[in]    root    Root of selection tree to process.
@@ -148,7 +133,7 @@ class SelectionCollection::Impl
          *
          * Recursively searches the selection tree for unresolved external
          * references.  If one is found, finds the referenced group in
-         * \a _grps and replaces the reference with a constant element that
+         * \a grps_ and replaces the reference with a constant element that
          * contains the atoms from the referenced group.  Any failures to
          * resolve references are reported to \p errors.
          *
@@ -159,13 +144,13 @@ class SelectionCollection::Impl
                                    MessageStringCollector *errors);
 
         //! Internal data, used for interfacing with old C code.
-        gmx_ana_selcollection_t _sc;
+        gmx_ana_selcollection_t sc_;
         //! Options object for setting global properties on the collection.
-        Options                 _options;
+        Options                 options_;
         //! Default reference position type for selections.
-        std::string             _rpost;
+        std::string             rpost_;
         //! Default output position type for selections.
-        std::string             _spost;
+        std::string             spost_;
         /*! \brief
          * Debugging level for the collection.
          *
@@ -176,11 +161,11 @@ class SelectionCollection::Impl
          *  - 3: like 1, also print the tree after evaluation
          *  - 4: combine 2 and 3
          */
-        int                     _debugLevel;
+        int                     debugLevel_;
         //! Whether setIndexGroups() has been called.
-        bool                    _bExternalGroupsSet;
+        bool                    bExternalGroupsSet_;
         //! External index groups (can be NULL).
-        gmx_ana_indexgrps_t    *_grps;
+        gmx_ana_indexgrps_t    *grps_;
 };
 
 /*! \internal \brief

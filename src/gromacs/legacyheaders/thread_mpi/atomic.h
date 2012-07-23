@@ -151,6 +151,7 @@ extern "C"
 #error No atomic operations implemented for this cpu/compiler combination. 
 #endif
 
+/** Indicates that no support for atomic operations is present. */
 #define TMPI_NO_ATOMICS
 
 
@@ -196,7 +197,7 @@ extern "C"
 
 
 
-/* System mutex used for locking to guarantee atomicity */
+/** System mutex used for locking to guarantee atomicity */
 static tMPI_Thread_mutex_t tMPI_Atomic_mutex = TMPI_THREAD_MUTEX_INITIALIZER;
 
 /** Atomic operations datatype
@@ -256,7 +257,7 @@ static tMPI_Thread_mutex_t tMPI_Atomic_mutex = TMPI_THREAD_MUTEX_INITIALIZER;
  */
 typedef struct tMPI_Atomic
 {
-    int value;  
+    int value;  /**< The atomic value. */
 }
 tMPI_Atomic_t;
 
@@ -272,7 +273,7 @@ tMPI_Atomic_t;
 */
 typedef struct tMPI_Atomic_ptr
 {
-    void* value;  
+    void* value;  /**< The atomic pointer value. */
 }
 tMPI_Atomic_ptr_t;
 
@@ -594,8 +595,6 @@ void tMPI_Spinlock_unlock( tMPI_Spinlock_t &x);
  */
 static inline int tMPI_Spinlock_islocked(const tMPI_Spinlock_t *x)
 {
-    int rc;
-    
     if(tMPI_Spinlock_trylock(x) != 0)
     {
         /* It was locked */
@@ -619,8 +618,6 @@ static inline int tMPI_Spinlock_islocked(const tMPI_Spinlock_t *x)
  */
 static inline void tMPI_Spinlock_wait(tMPI_Spinlock_t *x)
 {
-    int rc;
-    
     tMPI_Spinlock_lock(x);
     /* Got the lock now, so the waiting is over */
     tMPI_Spinlock_unlock(x);
