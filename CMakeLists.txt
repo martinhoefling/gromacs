@@ -40,8 +40,15 @@ SET(CPACK_PACKAGE_VERSION_MINOR "0")
 # Cmake modules/macros are in a subdirectory to keep this file cleaner
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX)
 set(CMAKE_INSTALL_PREFIX "/usr/local/gromacs" CACHE STRING "Installation prefix (installation will need write permissions here)" FORCE)
+endif()
+
+if (GMX_USE_RELATIVE_INSTALL_PATH)
+    set(GMX_INSTALL_PREFIX "" CACHE STRING "Prefix gets appended to CMAKE_INSTALL_PREFIX. For cpack it sets the root folder of the archive.")
+    mark_as_advanced(GMX_INSTALL_PREFIX)
+else()
+    set(GMX_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -51,11 +58,15 @@ endif(NOT CMAKE_BUILD_TYPE)
 enable_language(C)
 enable_language(CXX)
 
+set(GMX_USE_RELATIVE_INSTALL_PATH OFF CACHE STRING "Use relative paths not absolute paths for cmake install. Has only an effect on cpack.")
+mark_as_advanced(GMX_USE_RELATIVE_INSTALL_PATH)
+
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "gromacs.org")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Gromacs - a toolkit for high-performance molecular simulation")
-set(CPACK_SET_DESTDIR "ON")
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY 0)
+if (NOT GMX_USE_RELATIVE_INSTALL_PATH)
+    set(CPACK_SET_DESTDIR "ON")
+endif()
 set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_SOURCE_DIR}/admin/InstallWelcome.txt")
 # Its GPL/LGPL, so they do not have to agree to a license for mere usage, but some installers require this...
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/admin/InstallLicense.txt")
@@ -496,25 +507,25 @@ endif()
 
 option(GMX_INTERNAL_BOOST "Use minimal internal version of boost" OFF)
 if ( NOT GMX_INTERNAL_BOOST )
-  find_package( Boost 1.36.0 )
+  find_package( Boost 1.44.0 )
 else ( NOT GMX_INTERNAL_BOOST )
   set (Boost_FOUND FALSE)
 endif( NOT GMX_INTERNAL_BOOST )
 
-if(Boost_FOUND AND NOT Boost_VERSION VERSION_LESS "103600" )
+if(Boost_FOUND AND NOT Boost_VERSION VERSION_LESS "104400" )
   include_directories(${Boost_INCLUDE_DIRS})
 else()
   if(NOT BOOST_QUIETLY)
-    message("Boost >= 1.36 not found. Using minimal internal version. Not recommended if GROMACS is used as library!")
+    message("Boost >= 1.44 not found. Using minimal internal version. Not recommended if GROMACS is used as library!")
   endif()
   include_directories(${CMAKE_SOURCE_DIR}/src/external/boost)
   add_definitions( -DBOOST_NO_TYPEID )  #TYPEID not supported for minimal internal version (would add significant more code)
   # TODO: Propagate the above settings to the installed CMakeFiles.txt template
   # (from share/template/)
   # TODO: Reorder stuff such that INCL_INSTALL_DIR could be used here
-  set(PKG_CFLAGS "${PKG_CFLAGS} -DBOOST_NO_TYPEID -I${CMAKE_INSTALL_PREFIX}/include/gromacs/external/boost")
+  set(PKG_CFLAGS "${PKG_CFLAGS} -DBOOST_NO_TYPEID -I${GMX_INSTALL_PREFIX}include/gromacs/external/boost")
   install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/external/boost/boost
-          DESTINATION ${CMAKE_INSTALL_PREFIX}/include/gromacs/external/boost
+          DESTINATION ${GMX_INSTALL_PREFIX}include/gromacs/external/boost
           COMPONENT development)
 endif()
 set(BOOST_QUIETLY TRUE CACHE INTERNAL "")
@@ -526,8 +537,6 @@ else (LIBXML2_FOUND)
 endif (LIBXML2_FOUND)
 mark_as_advanced(GMX_BUILD_UNITTESTS)
 set(MEMORYCHECK_SUPPRESSIONS_FILE ${CMAKE_SOURCE_DIR}/cmake/legacy_and_external.supp)
-
-find_package(Doxygen)
 
 ########################################################################
 # Generate development version info for cache
@@ -728,6 +737,13 @@ elseif(${GMX_ACCELERATION} STREQUAL "BLUEGENE")
     set(GMX_X11 OFF CACHE BOOL "X11 not compatible with BlueGene, disabled!" FORCE)
     set(GMX_THREAD_MPI OFF CACHE BOOL "Thread-MPI not compatible with BlueGene, disabled!" FORCE)
     set(GMX_MPI ON CACHE BOOL "Use MPI on BlueGene" FORCE)
+# Access to /etc/passwd is not available on the back end of BlueGene,
+# despite being detected by CMake. This can cause linker warnings
+# about harmless things in src/gmxlib/string2.h.
+    set(HAVE_PWD_H OFF)
+# The automatic testing for endianness does not work for the BlueGene cross-compiler
+    set(GMX_IEEE754_BIG_ENDIAN_BYTE_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP byte order (by default)" FORCE)
+    set(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP word order (by default)" FORCE)
 elseif(${GMX_ACCELERATION} STREQUAL "POWER6")
     set(GMX_POWER6 1)
     set(GMX_SOFTWARE_INVSQRT OFF CACHE BOOL "Do not use software reciprocal square root on Power6" FORCE)
@@ -871,8 +887,6 @@ mark_as_advanced(GMX_EXTERNAL_LAPACK)
 mark_as_advanced(GMX_EXTERNAL_BLAS)
 
 set(GMX_USE_PLUGINS OFF CACHE INTERNAL "Whether GROMACS will really try to compile support for VMD plugins")
-set(GMX_VMD_PLUGIN_PATH)
-mark_as_advanced(GMX_VMD_PLUGIN_PATH)
 
 if(GMX_LOAD_PLUGINS)
   if(CYGWIN OR NOT WIN32)
@@ -882,49 +896,17 @@ if(GMX_LOAD_PLUGINS)
     gmx_test_dlopen(HAVE_DLOPEN)
   endif()
 
-  find_package(VMD)
-
-  # Test for unsuitable versions of VMD
-
-  if(VMD_FOUND AND NOT GMX_VMD_PLUGIN_PATH)
-    message(STATUS "Checking for suitable VMD version")
-    exec_program(${VMD_EXECUTABLE}
-      ARGS --help
-      OUTPUT_VARIABLE VMD_HELP
-      RETURN_VALUE VMD_EXEC_RETURN)
-
-    if(VMD_EXEC_RETURN EQUAL 0)
-      # This is the accepted idiom for subexpression matching, unfortunately
-      string(REGEX REPLACE ".*VMD for .*, version ([0-9]+\\.[0-9]*\\.?[0-9]*).*" "\\1" VMD_VERSION ${VMD_HELP})
-      string(REGEX REPLACE ".*VMD for (.*), version .*" "\\1" VMD_ARCH ${VMD_HELP})
-
-      if(VMD_VERSION VERSION_LESS "1.8")
-        MESSAGE(WARNING "Found VMD version ${VMD_VERSION}, but GROMACS needs at least 1.8")
-        unset(VMD_EXECUTABLE)
-        set(VMD_FOUND FALSE)
-      else()
-        message(STATUS "VMD version ${VMD_VERSION} is suitable")
-        if(DEFINED ENV{VMDDIR})
-          # This permits GROMACS to avoid hard-coding a fall-back
-          # path that it can tell right now would be useless.
-          set(GMX_VMD_PLUGIN_PATH "$ENV{VMDDIR}/plugins/${VMD_ARCH}/molfile" CACHE PATH "Path to VMD plugins for molfile I/O")
-        else()
-          set(GMX_VMD_PLUGIN_PATH "/usr/local/lib/vmd/plugins/*/molfile" CACHE PATH "Path to VMD plugins for molfile I/O")
-        endif()
-      endif()
-
-      # clean up
-      unset(VMD_HELP)
-      unset(VMD_VERSION)
-      unset(VMD_ARCH)
-    endif()
-  endif()
-
   # so, should we use plug-ins?
   if((WIN32 AND NOT CYGWIN) OR (HAVE_DLOPEN AND BUILD_SHARED_LIBS))
-    if (NOT VMD_QUIETLY)
-      MESSAGE(STATUS "Found the ability to use plug-ins when building shared libaries, so will compile to use plug-ins (e.g. to read VMD-supported file formats).")
-    endif(NOT VMD_QUIETLY)
+    if(NOT VMD_QUIETLY)
+      MESSAGE(STATUS
+          "Found the ability to use plug-ins when building shared libaries, "
+          "so will compile to use plug-ins (e.g. to read VMD-supported file "
+          "formats).")
+    endif()
+    if(NOT GMX_VMD_PLUGIN_PATH)
+      find_package(VMD)
+    endif()
     set(GMX_USE_PLUGINS ON)
     list(APPEND GMX_EXTRA_LIBRARIES ${CMAKE_DL_LIBS}) # magic cross-platform pre-set variable for dlopen library
     set(PKG_DL_LIBS "-l${CMAKE_DL_LIBS}")
@@ -1003,15 +985,14 @@ endif()
 ########################################################################
 # Specify install locations and which subdirectories to process        #
 ########################################################################
-if ( DEFINED GMXLIB )
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${GMXLIB}")
-else()
-    set(LIB_INSTALL_DIR  ${CMAKE_INSTALL_PREFIX}/lib)
+if ( NOT DEFINED GMXLIB )
+    set(GMXLIB lib)
 endif()
-set(BIN_INSTALL_DIR  ${CMAKE_INSTALL_PREFIX}/bin)
-set(DATA_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/share/gromacs)
-set(MAN_INSTALL_DIR  ${CMAKE_INSTALL_PREFIX}/share/man)
-set(INCL_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include)
+set(LIB_INSTALL_DIR "${GMX_INSTALL_PREFIX}${GMXLIB}")
+set(BIN_INSTALL_DIR  ${GMX_INSTALL_PREFIX}bin)
+set(DATA_INSTALL_DIR ${GMX_INSTALL_PREFIX}share/gromacs)
+set(MAN_INSTALL_DIR  ${GMX_INSTALL_PREFIX}share/man)
+set(INCL_INSTALL_DIR ${GMX_INSTALL_PREFIX}include)
 
 set(GMXLIBDIR        ${DATA_INSTALL_DIR}/top)
 
@@ -1021,12 +1002,12 @@ set(GMXLIBDIR        ${DATA_INSTALL_DIR}/top)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CMAKE_SKIP_BUILD_RPATH  FALSE)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-    set(CMAKE_INSTALL_RPATH "${LIB_INSTALL_DIR}")
+    set(CMAKE_INSTALL_RPATH "\\\$ORIGIN/../${GMXLIB}")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 endif()
 
+add_subdirectory(doxygen)
 add_subdirectory(share)
-add_subdirectory(man)
 add_subdirectory(src)
 add_subdirectory(scripts)
 
@@ -1042,39 +1023,6 @@ ADD_CUSTOM_TARGET(uninstall
                   "${CMAKE_COMMAND}" -P 
                   "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 ###########################
-
-########################################################################
-# Doxygen configuration
-########################################################################
-if (DOXYGEN_FOUND)
-    FILE(GLOB NB_KERNEL_DIRS src/gromacs/gmxlib/nonbonded/nb_kernel_*/)
-    LIST(REMOVE_ITEM NB_KERNEL_DIRS
-         ${CMAKE_SOURCE_DIR}/src/gromacs/gmxlib/nonbonded/nb_kernel_c)
-    FOREACH(NB_KERNEL_DIR ${NB_KERNEL_DIRS})
-        SET(NB_KERNEL_DIRS_TO_IGNORE_IN_DOXYGEN
-            "${NB_KERNEL_DIRS_TO_IGNORE_IN_DOXYGEN} \\\n                         ${NB_KERNEL_DIR}")
-    ENDFOREACH(NB_KERNEL_DIR)
-    CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Doxyfile-common.cmakein
-                   ${CMAKE_BINARY_DIR}/Doxyfile-common)
-    CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Doxyfile.cmakein
-                   ${CMAKE_BINARY_DIR}/Doxyfile)
-    CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Doxyfile-lib.cmakein
-                   ${CMAKE_BINARY_DIR}/Doxyfile-lib)
-    CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Doxyfile-user.cmakein
-                   ${CMAKE_BINARY_DIR}/Doxyfile-user)
-    add_custom_target(doc
-      ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Generating full documentation with Doxygen" VERBATIM)
-    add_custom_target(doc-user
-      ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile-user
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Generating user documentation with Doxygen" VERBATIM)
-    add_custom_target(doc-lib
-      ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile-lib
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Generating libary documentation with Doxygen" VERBATIM)
-endif (DOXYGEN_FOUND)
 
 
 ########################################################################

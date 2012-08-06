@@ -1434,6 +1434,7 @@ double do_lbfgs(FILE *fplog,t_commrec *cr,
   int    start,end,number_steps;
   gmx_mdoutf_t *outf;
   int    i,k,m,n,nfmax,gf,step;
+  int    mdof_flags;
   /* not used */
   real   terminate;
 
@@ -1593,7 +1594,23 @@ double do_lbfgs(FILE *fplog,t_commrec *cr,
     do_x = do_per_step(step,inputrec->nstxout);
     do_f = do_per_step(step,inputrec->nstfout);
 
-    write_traj(fplog,cr,outf,MDOF_X | MDOF_F | MDOF_IMD,
+    mdof_flags = 0;
+    if (do_x)
+    {
+        mdof_flags |= MDOF_X;
+    }
+
+    if (do_f)
+    {
+        mdof_flags |= MDOF_F;
+    }
+
+    if (inputrec->bIMD)
+    {
+        mdof_flags |= MDOF_IMD;
+    }
+
+    write_traj(fplog,cr,outf,mdof_flags,
                top_global,step,(real)step,state,state,f,f,NULL,NULL);
 
     /* Do the linesearching in the direction dx[point][0..(n-1)] */
