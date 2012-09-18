@@ -35,6 +35,10 @@
  * \author Teemu Murtola <teemu.murtola@cbr.su.se>
  * \ingroup module_selection
  */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <gtest/gtest.h>
 
 #include "gromacs/legacyheaders/smalloc.h"
@@ -362,6 +366,26 @@ TEST_F(SelectionCollectionTest, ParsesSelectionsFromFile)
     EXPECT_STREQ("resname RB RC", sel_[1].selectionText());
 }
 
+#ifdef HAVE_REGEX_H
+TEST_F(SelectionCollectionTest, HandlesInvalidRegularExpressions)
+{
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    EXPECT_THROW({
+            sc_.parseFromString("resname ~ \"R[A\"");
+            sc_.compile();
+        }, gmx::InvalidInputError);
+}
+#else
+TEST_F(SelectionCollectionTest, HandlesUnsupportedRegularExpressions)
+{
+    ASSERT_NO_FATAL_FAILURE(loadTopology("simple.gro"));
+    EXPECT_THROW({
+            sc_.parseFromString("resname \"R[AD]\"");
+            sc_.compile();
+        }, gmx::InvalidInputError);
+}
+#endif
+
 TEST_F(SelectionCollectionTest, HandlesMissingMethodParamValue)
 {
     EXPECT_THROW(sc_.parseFromString("mindist from atomnr 1 cutoff"),
@@ -377,6 +401,12 @@ TEST_F(SelectionCollectionTest, HandlesMissingMethodParamValue2)
 TEST_F(SelectionCollectionTest, HandlesMissingMethodParamValue3)
 {
     EXPECT_THROW(sc_.parseFromString("within of atomnr 1"),
+                 gmx::InvalidInputError);
+}
+
+TEST_F(SelectionCollectionTest, HandlesHelpKeywordInInvalidContext)
+{
+    EXPECT_THROW(sc_.parseFromString("resname help"),
                  gmx::InvalidInputError);
 }
 
@@ -465,7 +495,7 @@ TEST_F(SelectionCollectionDataTest, HandlesResnr)
 {
     static const char * const selections[] = {
         "resnr 1 2 5",
-        "resnr 4 to 3",
+        "resid 4 to 3",
         NULL
     };
     runTest("simple.gro", selections);
@@ -475,6 +505,7 @@ TEST_F(SelectionCollectionDataTest, HandlesResIndex)
 {
     static const char * const selections[] = {
         "resindex 1 4",
+        "residue 1 3",
         NULL
     };
     runTest("simple.pdb", selections);
@@ -486,7 +517,7 @@ TEST_F(SelectionCollectionDataTest, HandlesAtomname)
 {
     static const char * const selections[] = {
         "name CB",
-        "name S1 S2",
+        "atomname S1 S2",
         NULL
     };
     runTest("simple.gro", selections);
@@ -712,18 +743,40 @@ TEST_F(SelectionCollectionDataTest, HandlesWithinConstantPositions)
     runTest("simple.gro", selections);
 }
 
-#ifdef HAVE_REGEX_H
-TEST_F(SelectionCollectionDataTest, HandlesRegexMatching)
-#else
-TEST_F(SelectionCollectionDataTest, DISABLED_HandlesRegexMatching)
-#endif
+
+TEST_F(SelectionCollectionDataTest, HandlesForcedStringMatchingMode)
 {
     static const char * const selections[] = {
-        "resname \"R[BD]\"",
+        "name = S1 \"C?\"",
+        "name ? S1 \"C?\"",
         NULL
     };
     runTest("simple.gro", selections);
 }
+
+
+TEST_F(SelectionCollectionDataTest, HandlesWildcardMatching)
+{
+    static const char * const selections[] = {
+        "name \"S?\"",
+        "name ? \"S?\"",
+        NULL
+    };
+    runTest("simple.gro", selections);
+}
+
+
+#ifdef HAVE_REGEX_H
+TEST_F(SelectionCollectionDataTest, HandlesRegexMatching)
+{
+    static const char * const selections[] = {
+        "resname \"R[BD]\"",
+        "resname ~ \"R[BD]\"",
+        NULL
+    };
+    runTest("simple.gro", selections);
+}
+#endif
 
 
 TEST_F(SelectionCollectionDataTest, HandlesBasicBoolean)

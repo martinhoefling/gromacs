@@ -49,13 +49,16 @@
 #define USE_REGEX
 #endif
 
-#include "macros.h"
-#include "smalloc.h"
-#include "string2.h"
+#include <string>
+
+#include "gromacs/legacyheaders/macros.h"
+#include "gromacs/legacyheaders/smalloc.h"
+#include "gromacs/legacyheaders/string2.h"
 
 #include "gromacs/selection/selmethod.h"
-#include "gromacs/utility/errorcodes.h"
+#include "gromacs/utility/exceptions.h"
 #include "gromacs/utility/messagestringcollector.h"
+#include "gromacs/utility/stringutil.h"
 
 #include "keywords.h"
 #include "parsetree.h"
@@ -139,6 +142,8 @@ typedef struct t_methoddata_kwreal
  */
 typedef struct t_methoddata_kwstr
 {
+    /** Matching type for the strings. */
+    gmx::SelectionStringMatchType       matchType;
     /** Array of values for the keyword. */
     char             **v;
     /** Number of elements in the \p val array. */
@@ -156,7 +161,7 @@ typedef struct t_methoddata_kwstr
             regex_t    r;
 #endif
             /** The string if \p bRegExp is false; */
-            char      *s;
+            const char *s;
         }              u;
     }                 *m;
     /**< Array of strings/regular expressions to match against.*/
@@ -455,7 +460,28 @@ init_data_kwstr(int npar, gmx_ana_selparam_t *param)
     t_methoddata_kwstr *data;
 
     snew(data, 1);
+    data->matchType = gmx::eStringMatchType_Auto;
     return data;
+}
+
+/*!
+ * \param[in,out] sel   Selection element to initialize.
+ * \param[in]     matchType  Method to use to match string values.
+ *
+ * Sets the string matching method for string keyword matching.
+ */
+void
+_gmx_selelem_set_kwstr_match_type(const gmx::SelectionTreeElementPointer &sel,
+                                  gmx::SelectionStringMatchType matchType)
+{
+    t_methoddata_kwstr *d = (t_methoddata_kwstr *)sel->u.expr.mdata;
+
+    if (sel->type != SEL_EXPRESSION || !sel->u.expr.method
+        || sel->u.expr.method->name != sm_keyword_str.name)
+    {
+        return;
+    }
+    d->matchType = matchType;
 }
 
 /*!
@@ -468,10 +494,7 @@ static void
 init_kwstr(t_topology *top, int npar, gmx_ana_selparam_t *param, void *data)
 {
     t_methoddata_kwstr *d = (t_methoddata_kwstr *)data;
-    char               *s;
     int                 i;
-    size_t              j;
-    bool                bRegExp;
 
     d->v   = param[0].val.u.s;
     d->n   = param[1].val.nr;
@@ -483,37 +506,34 @@ init_kwstr(t_topology *top, int npar, gmx_ana_selparam_t *param, void *data)
     snew(d->m, d->n);
     for (i = 0; i < d->n; ++i)
     {
-        s = param[1].val.u.s[i];
-        bRegExp = false;
-        for (j = 0; j < strlen(s); ++j)
+        const char *s = param[1].val.u.s[i];
+        bool bRegExp = (d->matchType == gmx::eStringMatchType_RegularExpression);
+        if (d->matchType == gmx::eStringMatchType_Auto)
         {
-            if (ispunct(s[j]) && s[j] != '?' && s[j] != '*')
+            for (size_t j = 0; j < strlen(s); ++j)
             {
-                bRegExp = true;
-                break;
+                if (ispunct(s[j]) && s[j] != '?' && s[j] != '*')
+                {
+                    bRegExp = true;
+                    break;
+                }
             }
         }
         if (bRegExp)
         {
-            // TODO: Get rid of these prints to stderr
 #ifdef USE_REGEX
-            char               *buf;
-            snew(buf, strlen(s) + 3);
-            sprintf(buf, "^%s$", s);
-            if (regcomp(&d->m[i].u.r, buf, REG_EXTENDED | REG_NOSUB))
+            std::string buf(gmx::formatString("^%s$", s));
+            if (regcomp(&d->m[i].u.r, buf.c_str(), REG_EXTENDED | REG_NOSUB) != 0)
             {
-                bRegExp = false;
-                fprintf(stderr, "WARNING: error in regular expression,\n"
-                                "         will match '%s' as a simple string\n", s);
+                GMX_THROW(gmx::InvalidInputError(gmx::formatString(
+                                "Error in regular expression \"%s\"", s)));
             }
-            sfree(buf);
 #else
-            bRegExp = false;
-            fprintf(stderr, "WARNING: no regular expressions support,\n"
-                            "         will match '%s' as a simple string\n", s);
+            GMX_THROW(gmx::InvalidInputError(gmx::formatString(
+                            "No regular expression support, cannot match \"%s\"", s)));
 #endif
         }
-        if (!bRegExp)
+        else
         {
             d->m[i].u.s = s;
         }
@@ -544,6 +564,7 @@ free_data_kwstr(void *data)
         }
     }
     sfree(d->m);
+    sfree(d);
 }
 
 /*!
@@ -574,18 +595,16 @@ evaluate_keyword_str(t_topology *top, t_trxframe *fr, t_pbc *pbc,
 #ifdef USE_REGEX
                 /* This branch should only be taken if regular expressions
                  * are available, but the ifdef is still needed. */
-                if (!regexec(&d->m[j].u.r, d->v[i], 0, NULL, 0))
-                {
-                    bFound = true;
-                }
+                bFound = (regexec(&d->m[j].u.r, d->v[i], 0, NULL, 0) == 0);
 #endif
+            }
+            else if (d->matchType == gmx::eStringMatchType_Exact)
+            {
+                bFound = (strcmp(d->m[j].u.s, d->v[i]) == 0);
             }
             else
             {
-                if (gmx_wcmatch(d->m[j].u.s, d->v[i]) == 0)
-                {
-                    bFound = true;
-                }
+                bFound = (gmx_wcmatch(d->m[j].u.s, d->v[i]) == 0);
             }
         }
         if (bFound)
@@ -642,6 +661,7 @@ free_data_kweval(void *data)
     t_methoddata_kweval *d = (t_methoddata_kweval *)data;
 
     _gmx_selelem_free_method(d->kwmethod, d->kwmdata);
+    sfree(d);
 }
 
 /*!
@@ -680,24 +700,21 @@ evaluate_kweval(t_topology *top, t_trxframe *fr, t_pbc *pbc,
 }
 
 /*!
- * \param[out]  selp    Pointer to receive a pointer to the created selection
- *      element (set to NULL on error).
  * \param[in]   method  Keyword selection method to evaluate.
- * \param[in]   param   Parameter that gives the group to evaluate \p method in.
+ * \param[in]   params  Parameter that gives the group to evaluate \p method in.
  * \param[in]   scanner Scanner data structure.
- * \returns     0 on success, non-zero error code on error.
+ * \returns     Pointer to the created selection element (NULL on error).
  *
- * Creates a \ref SEL_EXPRESSION selection element (pointer put in \c *selp)
- * that evaluates the keyword method given by \p method in the group given by
- * \p param.
+ * Creates a \ref SEL_EXPRESSION selection element that evaluates the keyword
+ * method given by \p method in the group given by \p param.
+ *
+ * The name of \p param should be empty.
  */
-int
-_gmx_sel_init_keyword_evaluator(t_selelem **selp, gmx_ana_selmethod_t *method,
-                                t_selexpr_param *param, void *scanner)
+gmx::SelectionTreeElementPointer
+_gmx_sel_init_keyword_evaluator(gmx_ana_selmethod_t *method,
+                                const gmx::SelectionParserParameterList &params,
+                                void *scanner)
 {
-    t_selelem            *sel;
-    t_methoddata_kweval  *data;
-
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
     char  buf[1024];
     sprintf(buf, "In evaluation of '%s'", method->name);
@@ -706,15 +723,15 @@ _gmx_sel_init_keyword_evaluator(t_selelem **selp, gmx_ana_selmethod_t *method,
     if ((method->flags & (SMETH_SINGLEVAL | SMETH_VARNUMVAL))
         || method->outinit || method->pupdate)
     {
-        _gmx_selexpr_free_params(param);
-        GMX_ERROR(gmx::eeInternalError,
-                  "Unsupported keyword method for arbitrary group evaluation");
+        GMX_THROW(gmx::InternalError(
+                "Unsupported keyword method for arbitrary group evaluation"));
     }
 
-    *selp = NULL;
-    sel = _gmx_selelem_create(SEL_EXPRESSION);
+    gmx::SelectionTreeElementPointer sel(
+            new gmx::SelectionTreeElement(SEL_EXPRESSION));
     _gmx_selelem_set_method(sel, method, scanner);
 
+    t_methoddata_kweval  *data;
     snew(data, 1);
     data->kwmethod = sel->u.expr.method;
     data->kwmdata  = sel->u.expr.mdata;
@@ -738,14 +755,10 @@ _gmx_sel_init_keyword_evaluator(t_selelem **selp, gmx_ana_selmethod_t *method,
 
     sel->u.expr.method->param[0].val.u.g = &data->g;
 
-    sfree(param->name);
-    param->name = NULL;
-    if (!_gmx_sel_parse_params(param, sel->u.expr.method->nparams,
+    if (!_gmx_sel_parse_params(params, sel->u.expr.method->nparams,
                                sel->u.expr.method->param, sel, scanner))
     {
-        _gmx_selelem_free(sel);
-        return -1;
+        return gmx::SelectionTreeElementPointer();
     }
-    *selp = sel;
-    return 0;
+    return sel;
 }
