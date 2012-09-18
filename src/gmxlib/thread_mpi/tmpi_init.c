@@ -71,7 +71,7 @@ files.
 
 /* there are a few global variables that maintain information about the
    running threads. Some are defined by the MPI standard: */
-tMPI_Comm TMPI_COMM_WORLD=NULL;
+/* TMPI_COMM_WORLD is in tmpi_malloc.c due to technical reasons */
 tMPI_Group TMPI_GROUP_EMPTY=NULL;
 
 
@@ -91,8 +91,6 @@ static tmpi_bool tmpi_finalized=FALSE;
 
 /* misc. global information about MPI */
 struct tmpi_global *tmpi_global=NULL;
-
-
 
 
 
@@ -136,33 +134,6 @@ void tMPI_Trace_print(const char *fmt, ...)
     tMPI_Thread_mutex_unlock(&mtx);
 }
 #endif
-
-
-void *tMPI_Malloc(size_t size)
-{
-    void *ret=(void*)malloc(size);
-
-    if (!ret)
-    {
-        tMPI_Error(TMPI_COMM_WORLD, TMPI_ERR_MALLOC);
-    }
-    return ret;
-}
-
-void *tMPI_Realloc(void *p, size_t size)
-{
-    void *ret=(void*)realloc(p, size);
-    if (!ret)
-    {
-        tMPI_Error(TMPI_COMM_WORLD, TMPI_ERR_MALLOC);
-    }
-    return ret;
-}
-
-void tMPI_Free(void *p)
-{
-    free(p);
-}
 
 
 #if 0
@@ -340,6 +311,8 @@ static void tMPI_Global_init(struct tmpi_global *g, int Nthreads)
 
     tMPI_Thread_barrier_init( &(g->barrier), Nthreads);
 
+    tMPI_Thread_mutex_init(&(g->comm_link_lock));
+
 #if ! (defined( _WIN32 ) || defined( _WIN64 ) )
     /* the time at initialization. */
     gettimeofday( &(g->timer_init), NULL);
@@ -353,6 +326,7 @@ static void tMPI_Global_init(struct tmpi_global *g, int Nthreads)
 static void tMPI_Global_destroy(struct tmpi_global *g)
 {
     tMPI_Thread_mutex_destroy(&(g->timer_mutex));
+    tMPI_Thread_mutex_destroy(&(g->comm_link_lock));
 }
 
 
@@ -588,14 +562,18 @@ int tMPI_Finalize(void)
         tMPI_Thread_key_delete(id_key);
         /* de-allocate all the comm stuctures. */
         {
-            tMPI_Comm cur=TMPI_COMM_WORLD->next;
+            tMPI_Comm cur;
+
+            tMPI_Thread_mutex_lock(&(tmpi_global->comm_link_lock));
+            cur=TMPI_COMM_WORLD->next;
             while(cur && (cur!=TMPI_COMM_WORLD) )
             {
                 tMPI_Comm next=cur->next;
-                tMPI_Comm_destroy(cur);
+                tMPI_Comm_destroy(cur, FALSE);
                 cur=next;
             }
-            tMPI_Comm_destroy(TMPI_COMM_WORLD);
+            tMPI_Comm_destroy(TMPI_COMM_WORLD, FALSE);
+            tMPI_Thread_mutex_unlock(&(tmpi_global->comm_link_lock));
         }
 
         tMPI_Group_free(&TMPI_GROUP_EMPTY);
