@@ -36,6 +36,21 @@ SET(CPACK_PACKAGE_VERSION_MAJOR "5")
 SET(CPACK_PACKAGE_VERSION_MINOR "0")
 #SET(CPACK_PACKAGE_VERSION_PATCH "0")
 
+# The numerical gromacs version. It is 40600 for 4.6.0.
+# The #define GMX_VERSION in gmx_header_config_h is set to this value.
+math(EXPR NUM_VERSION 
+    "${CPACK_PACKAGE_VERSION_MAJOR}*10000 + ${CPACK_PACKAGE_VERSION_MINOR}*100")
+if(CPACK_PACKAGE_VERSION_PATCH)
+    math(EXPR NUM_VERSION 
+         "${NUM_VERSION} + ${CPACK_PACKAGE_VERSION_PATCH}")
+endif()
+
+# The API version tracks the numerical Gromacs version (for now).
+# It is potentially different from the Gromacs version in the future, if
+# the programs/libraries diverge from the presumably more stable API.
+# The #define GMX_API_VERSION in version.h is set to this value to
+# provide backward compatibility of software written against the Gromacs API.
+set(API_VERSION ${NUM_VERSION})
 
 # Cmake modules/macros are in a subdirectory to keep this file cleaner
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -134,6 +149,7 @@ IF( WIN32 AND NOT CYGWIN)
   ENDIF()
 ENDIF()
 
+
 ########################################################################
 # User input options                                                   #
 ########################################################################
@@ -174,7 +190,8 @@ mark_as_advanced(GMX_MPI_IN_PLACE)
 option(GMX_LOAD_PLUGINS "Compile with plugin support, needed to read VMD supported file formats" ON)
 mark_as_advanced(GMX_LOAD_PLUGINS)
 
-option(GMX_OPENMP "Enable OpenMP-based mutithreading. " ON)
+option(GMX_GPU  "Enable GPU acceleration" ON)
+option(GMX_OPENMP "Enable OpenMP-based multithreading" ON)
 
 option(USE_VERSION_H "Generate development version string/information" ON)
 mark_as_advanced(USE_VERSION_H)
@@ -187,6 +204,8 @@ if(UNIX AND NOT APPLE)
     mark_as_advanced(GMX_PREFER_STATIC_LIBS)
 endif()
 
+option(GMX_CYCLE_SUBCOUNTERS "Enable cycle subcounters to get a more detailed cycle timings" OFF)
+mark_as_advanced(GMX_CYCLE_SUBCOUNTERS)
 
 ######################################################################
 # compiler tests
@@ -205,8 +224,22 @@ include(CheckCXXCompilerFlag)
 if(GMX_OPENMP)
     find_package(OpenMP)
     if(OPENMP_FOUND)
-        set(GROMACS_C_FLAGS "${OpenMP_C_FLAGS} ${GROMACS_C_FLAGS}")
-        set(GROMACS_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${GROMACS_CXX_FLAGS}")
+        #- only set linker flag, if user didn't set them manual
+        #- cmake on windows doesn't support linker flags passed to target_link_libraries
+        #  (cmake treats /openmp as \openmp library file) and no openmp linker flags are needed
+        if(NOT (WIN32 AND NOT CYGWIN))
+            if(CMAKE_COMPILER_IS_GNUCC AND GMX_PREFER_STATIC_OPENMP)
+                set(OpenMP_LINKER_FLAGS "-Wl,-static -lgomp -lrt -Wl,-Bdynamic -lpthread")
+                set(OpenMP_SHARED_LINKER_FLAGS "")
+            else()
+                if(NOT DEFINED OpenMP_LINKER_FLAGS)
+                    set(OpenMP_LINKER_FLAGS "${OpenMP_C_FLAGS}")
+                endif()
+                if(NOT DEFINED OpenMP_SHARED_LINKER_FLAGS)
+                    set(OpenMP_SHARED_LINKER_FLAGS "${OpenMP_C_FLAGS}")
+                endif()
+            endif()
+        endif()
     else(OPENMP_FOUND)
         message(WARNING
                 "Compiler not supporting OpenMP. This might hurt your performance a lot, "
@@ -219,6 +252,15 @@ endif()
 
 include(gmxCFlags)
 gmx_c_flags()
+
+include(gmxGetCompilerVersion)
+get_compiler_version()
+
+# gcc 4.4.x is buggy and crashes when compiling some files with O3 and OpenMP on.
+# Detect here whether applying a workaround is needed and will apply it later
+# on the affected files.
+include(gmxGCC44O3BugWorkaround)
+gmx_check_gcc44_bug_workaround_needed(GMX_USE_GCC44_BUG_WORKAROUND)
 
 ########################################################################
 # Set up binary and library suffixing 
@@ -342,21 +384,23 @@ else(GMX_OPENMM)
 endif(GMX_OPENMM)
 
 
-
-
 ########################################################################
 # Basic system tests (standard libraries, headers, functions, types)   #
 ########################################################################
 include(CheckIncludeFiles)
+include(CheckIncludeFileCXX)
 check_include_files(unistd.h	 HAVE_UNISTD_H)
 check_include_files(pwd.h        HAVE_PWD_H)
 check_include_files(pthread.h    HAVE_PTHREAD_H)
 check_include_files(dirent.h     HAVE_DIRENT_H)
-check_include_files(regex.h      HAVE_REGEX_H)
-check_include_files(sys/types.h  HAVE_SYS_TYPES_H)
 check_include_files(sys/time.h   HAVE_SYS_TIME_H)
 check_include_files(io.h  		 HAVE_IO_H)
+check_include_files(sched.h      HAVE_SCHED_H)
 
+check_include_files(regex.h      HAVE_POSIX_REGEX)
+check_include_file_cxx(regex     HAVE_CXX11_REGEX)
+# TODO: It could be nice to inform the user if no regex support is found,
+# as selections won't be fully functional.
 
 include(CheckFunctionExists)
 check_function_exists(strdup            HAVE_STRDUP)
@@ -370,6 +414,8 @@ check_function_exists(fileno            HAVE_FILENO)
 check_function_exists(_commit           HAVE__COMMIT)
 check_function_exists(lstat             HAVE_LSTAT)
 check_function_exists(sigaction         HAVE_SIGACTION)
+check_function_exists(sysconf           HAVE_SYSCONF)
+check_function_exists(sched_setaffinity HAVE_SCHED_SETAFFINITY)
 
 include(CheckLibraryExists)
 check_library_exists(m sqrt "" HAVE_LIBM)
@@ -465,6 +511,60 @@ if(GMX_OPENMM)
     find_package(OpenMM) 
 endif(GMX_OPENMM)
 
+
+if(GMX_GPU)
+    if(GMX_DOUBLE)
+        message(WARNING "GPU acceleration is not available in double precision, disabled!")
+        set(GMX_GPU OFF CACHE BOOL "Enable GPU acceleration" FORCE)
+    endif()
+
+    # We support CUDA >=v3.2 on *nix, but <= v4.1 doesn't work with MSVC
+    if(MSVC)
+        find_package(CUDA 4.1)
+    else()
+        find_package(CUDA 3.2)
+    endif()
+
+    if (NOT EXISTS ${CUDA_TOOLKIT_ROOT_DIR})
+        message(FATAL_ERROR "
+    mdrun supports native GPU acceleration on NVIDIA hardware with compute
+    capability >=2.0. This requires the NVIDIA CUDA library, which was not
+    found; the location can be hinted by setting CUDA_TOOLKIT_ROOT_DIR.
+
+    CPU or GPU acceleration can be selected at runtime, but if you are
+    sure you can not make use of GPU acceleration, disable it by setting
+    the CMake variable GMX_GPU=OFF.")
+    endif()
+
+    if(NOT GMX_OPENMP)
+        message(WARNING "
+    In order to use GPU acceleration efficiently, mdrun requires OpenMP multithreding.
+    Without OpenMP only a single CPU core per GPU can be used which is suboptimal.
+    Note that with MPI multiple processes can be forced to use a single GPU, but this
+    typically inefficient.")
+    endif()
+
+    include(gmxManageNvccConfig)
+
+    # Check whether we can use atomic operations needed for polling wait for GPU
+    # (to avoid the cudaStreamSynchronize + ECC bug).
+    # With thread-MPI testing atomics has already been carried out, but without
+    # thread-MPI we need to invoke the atomics test independently.
+    if (NOT GMX_THREAD_MPI)
+        set(TEST_TMPI_ATOMICS_ONLY ON CACHE INTERNAL
+            "Test only the atomic operations of thread-MPI.")
+        include(ThreadMPI)
+    endif()
+
+    # we need this linker flag in case if we have ld >= 2.22 (typically with gcc 4.5+),
+    # but it's too cumbersome to check the ld version and the flag should not hurt
+    if(CMAKE_COMPILER_IS_GNUCC)
+        set(GROMACS_LINKER_FLAGS "-Wl,--add-needed ${GROMACS_LINKER_FLAGS}")
+    endif()
+
+    # annoyingly enough, FindCUDA leaves a few variables behind as non-advanced
+    mark_as_advanced(CUDA_BUILD_CUBIN CUDA_BUILD_EMULATION CUDA_SDK_ROOT_DIR CUDA_VERBOSE_BUILD)
+endif()
 
 if(APPLE)
    find_library(ACCELERATE_FRAMEWORK Accelerate)
@@ -593,6 +693,11 @@ gmx_test__finite(HAVE__FINITE)
 include(gmxTestCXX11)
 gmx_test_cxx11(GMX_CXX11 CXX11_FLAG)
 set(GROMACS_CXX_FLAGS "${CXX11_FLAG} ${GROMACS_CXX_FLAGS}")
+if(CXX11_FLAG)
+    #FIXME: add proper solution for progate all but cxx11 flag
+    set(CUDA_PROPAGATE_HOST_FLAGS no)
+    message(WARNING "Please manually add compiler flags to CUDA_NVCC_FLAGS. Automatic propogation temporary not working.")
+endif()
 
 include(gmxTestXDR)
 gmx_test_xdr(GMX_SYSTEM_XDR)
@@ -852,6 +957,11 @@ else(${GMX_FFT_LIBRARY} STREQUAL "FFTW3")
     MESSAGE(FATAL_ERROR "Invalid FFT library setting: ${GMX_FFT_LIBRARY}. Choose one of: fftw3, mkl, fftpack")
 endif(${GMX_FFT_LIBRARY} STREQUAL "FFTW3")
 
+# enable threaded fftw3 if we've found it 
+if(FFTW3_THREADS OR FFTW3F_THREADS)
+    add_definitions(-DFFT5D_FFTW_THREADS)
+endif()
+
 set(GMX_EXTERNAL_BLAS TRUE CACHE BOOL "Use external BLAS instead of built-in")
 set(GMX_EXTERNAL_LAPACK TRUE CACHE BOOL "Use external LAPACK instead of built-in")
 # MKL has BLAS/LAPACK routines
@@ -955,7 +1065,10 @@ if (NOT DEFINED GROMACS_C_FLAGS_SET)
         "Flags used by the compiler during all build types" FORCE)
     set(CMAKE_EXE_LINKER_FLAGS 
         "${GROMACS_LINKER_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}" 
-        CACHE STRING "Linker flags" FORCE) 
+        CACHE STRING "Linker flags for creating executables" FORCE) 
+    set(CMAKE_SHARED_LINKER_FLAGS 
+        "${GROMACS_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS}" 
+        CACHE STRING "Linker flags for creating shared libraries" FORCE) 
 endif (NOT DEFINED GROMACS_C_FLAGS_SET)
 
 ######################################

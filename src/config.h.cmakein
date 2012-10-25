@@ -1,4 +1,16 @@
+/*! \libinternal \file
+ * \brief
+ * Include file for configuration macros from the build system.
+ *
+ * This header is not installed, so headers must not reference macros defined
+ * here.
+ *
+ * \inlibraryapi
+ */
 #include "gromacs/utility/gmx_header_config.h"
+
+/* TODO: For now, disable Doxygen warnings from here */
+/*! \cond */
 
 /* Disable warnings about double-to-float conversion accuracy loss on MSVC */
 #ifdef _MSC_VER
@@ -167,6 +179,9 @@
 /* Use the PowerPC hardware 1/sqrt(x) */
 #cmakedefine GMX_POWERPC_INVSQRT
 
+/* Use sub-counters */
+#cmakedefine GMX_CYCLE_SUBCOUNTERS
+
 /* Compile with plugin support */
 #cmakedefine GMX_USE_PLUGINS
 
@@ -181,6 +196,9 @@
 
 /* Define when Windows threads are used */
 #cmakedefine THREAD_WINDOWS
+
+/* Define when thread-MPI atomic operations are available */
+#cmakedefine TMPI_ATOMICS
 
 /* Define for busy wait option  */
 #cmakedefine TMPI_WAIT_FOR_NO_ONE
@@ -199,6 +217,9 @@
 
 /* Enable x86 gcc inline assembly */
 #cmakedefine GMX_X86_GCC_INLINE_ASM
+
+/* Use GPU native acceleration */
+#cmakedefine GMX_GPU
 
 /* Define to 1 if fseeko (and presumably ftello) exists and is declared. */
 #cmakedefine HAVE_FSEEKO
@@ -269,20 +290,26 @@
 /* Define to 1 if yo have the <dirent.h> header file. */
 #cmakedefine HAVE_DIRENT_H
 
-/* Define to 1 if yo have the <regex.h> header file. */
-#cmakedefine HAVE_REGEX_H
-
-/* Define to 1 if you have the <sys/types.h> header file. */
-#cmakedefine HAVE_SYS_TYPES_H
-
 /* Define to 1 if you have the <sys/time.h> header file. */
 #cmakedefine HAVE_SYS_TIME_H
 
 /* Define to 1 if you have the <x86intrin.h> header file */
 #cmakedefine HAVE_X86INTRIN_H
 
-/* Define for sched.h (this is for thread_mpi)*/
-#define HAVE_SCHED_H
+/* Define to 1 if you have the <sched.h> header */
+#cmakedefine HAVE_SCHED_H
+
+/* Define to 1 if you have the POSIX <regex.h> header file. */
+#cmakedefine HAVE_POSIX_REGEX
+
+/* Define to 1 if you have the C++11 <regex> header file. */
+#cmakedefine HAVE_CXX11_REGEX
+
+/* Define to 1 if you have the sysconf() function */
+#cmakedefine HAVE_SYSCONF
+
+/* Define to 1 if you have the sched_setaffinity() function */
+#cmakedefine HAVE_SCHED_SETAFFINITY
 
 /* Bytes in IEEE fp word are in big-endian order if set, little-endian if not.
    Only relevant when FLOAT_FORMAT_IEEE754 is defined. */
@@ -349,3 +376,5 @@
 #    error "or create a new such entry with your choice in the GUI _before_ hitting 'configure'."
 #  endif
 #endif
+
+/*! \endcond */

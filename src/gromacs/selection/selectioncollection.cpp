@@ -91,8 +91,10 @@ SelectionCollection::Impl::Impl()
 SelectionCollection::Impl::~Impl()
 {
     clearSymbolTable();
-    sc_.sel.clear();
+    // The tree must be freed before the SelectionData objects, since the
+    // tree may hold references to the position data in SelectionData.
     sc_.root.reset();
+    sc_.sel.clear();
     for (int i = 0; i < sc_.nvars; ++i)
     {
         sfree(sc_.varstrs[i]);
@@ -116,6 +118,16 @@ SelectionCollection::Impl::clearSymbolTable()
 namespace
 {
 
+/*! \brief
+ * Reads a single selection line from stdin.
+ *
+ * \param[in]  infile        File to read from (typically File::standardInput()).
+ * \param[in]  bInteractive  Whether to print interactive prompts.
+ * \param[out] line          The read line in stored here.
+ * \returns true if something was read, false if at end of input.
+ *
+ * Handles line continuation, reading also the continuing line(s) in one call.
+ */
 bool promptLine(File *infile, bool bInteractive, std::string *line)
 {
     if (bInteractive)
@@ -147,9 +159,20 @@ bool promptLine(File *infile, bool bInteractive, std::string *line)
     {
         fprintf(stderr, "\n");
     }
-    return line;
+    return true;
 }
 
+/*! \brief
+ * Helper function for tokenizing the input and pushing them to the parser.
+ *
+ * \param     scanner       Tokenizer data structure.
+ * \param     parserState   Parser data structure.
+ * \param[in] bInteractive  Whether to operate in interactive mode.
+ *
+ * Repeatedly reads tokens using \p scanner and pushes them to the parser with
+ * \p parserState until there is no more input, or until enough input is given
+ * (only in interactive mode).
+ */
 int runParserLoop(yyscan_t scanner, _gmx_sel_yypstate *parserState,
                   bool bInteractive)
 {
@@ -165,6 +188,9 @@ int runParserLoop(yyscan_t scanner, _gmx_sel_yypstate *parserState,
             {
                 break;
             }
+            // Empty commands cause the interactive parser to print out
+            // status information. This avoids producing those unnecessarily,
+            // e.g., from "resname RA;;".
             if (prevToken == CMD_SEP && token == CMD_SEP)
             {
                 continue;

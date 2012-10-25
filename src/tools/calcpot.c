@@ -36,6 +36,9 @@
 #include <config.h>
 #endif
 
+#include <stddef.h>
+
+#include "types/commrec.h"
 #include "vec.h"
 #include "calcpot.h"
 #include "nrnb.h"
@@ -215,8 +218,8 @@ FILE *init_calcpot(const char *log,const char *tpx,const char *table,
 		   matrix box,rvec **x, const output_env_t oenv)
 {
   gmx_localtop_t *ltop;
-  double   t,t0,lam0;
-  real     lam;
+  double   t,t0;
+  real     lam[efptNR];
   int      fep_state;
   gmx_bool     bNEMD,bSA;
   int      traj=0,xtc_traj=0;
@@ -247,7 +250,7 @@ FILE *init_calcpot(const char *log,const char *tpx,const char *table,
   }
 
   clear_rvec(mutot);
-  init_md(fplog,*cr,inputrec,oenv,&t,&t0,&lam,&fep_state,&lam0,
+  init_md(fplog,*cr,inputrec,oenv,&t,&t0,lam,&fep_state,NULL,
 	  &nrnb,mtop,NULL,-1,NULL,NULL,NULL,
 	  force_vir,shake_vir,mutot,&bSA,NULL,NULL,0);
 
@@ -284,7 +287,7 @@ FILE *init_calcpot(const char *log,const char *tpx,const char *table,
   /* Initiate forcerecord */
   *fr = mk_forcerec();
   init_forcerec(fplog,oenv,*fr,NULL,inputrec,mtop,*cr,
-		state->box,FALSE,table,NULL,table,NULL,TRUE,-1);
+		state->box,FALSE,table,NULL,table,NULL,NULL,TRUE,-1);
 
   /* Remove periodicity */  
   for(m=0; (m<DIM); m++)
