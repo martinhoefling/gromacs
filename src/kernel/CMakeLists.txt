@@ -1,6 +1,7 @@
 
 set(GMXPREPROCESS_SOURCES 
     add_par.c       
+    calc_verletbuf.c
     compute_io.c    
     convparm.c      
     gen_ad.c        
@@ -36,7 +37,7 @@ set(GMXPREPROCESS_SOURCES
 
 set(MDRUN_SOURCES 
     gctio.c    ionize.c runner.c
-    do_gct.c     repl_ex.c  xutils.c
+    do_gct.c     repl_ex.c  xutils.c pme_loadbal.c
     md.c         mdrun.c    genalg.c membed.c
     md_openmm.c)
 
@@ -46,17 +47,20 @@ set_target_properties(gmxpreprocess PROPERTIES OUTPUT_NAME "gmxpreprocess${GMX_L
     COMPILE_FLAGS "${OpenMP_C_FLAGS}")
 
 
+if(GMX_GPU OR GMX_OPENMM) 
+    include_directories(${CMAKE_SOURCE_DIR}/src/gmxlib/gpu_utils)
+endif()
+
 if(GMX_OPENMM) 
-    add_subdirectory(gmx_gpu_utils)
-    include_directories(./gmx_gpu_utils ${OpenMM_INCLUDE_DIR})
+    include_directories(${OpenMM_INCLUDE_DIR})
     link_directories(${OpenMM_LIBRARY_DIR}) 
     # with this define no evn.var. is needed with OPENMM_PLUGIN_DIR
     # if the same OpenMM installation is used for running and building 
     add_definitions( -DOPENMM_PLUGIN_DIR="${OpenMM_PLUGIN_DIR}" ) 
     file(TO_CMAKE_PATH ${OpenMM_PLUGIN_DIR} _path)
     add_library(openmm_api_wrapper STATIC openmm_wrapper.cpp)
-    target_link_libraries(openmm_api_wrapper gmx_gpu_utils ${OpenMM_LIBRARIES})
-    set(GMX_OPENMM_LIBRARIES openmm_api_wrapper gmx_gpu_utils ${OpenMM_LIBRARIES})   
+    target_link_libraries(openmm_api_wrapper ${OpenMM_LIBRARIES})
+    set(GMX_OPENMM_LIBRARIES openmm_api_wrapper ${OpenMM_LIBRARIES})   
 endif(GMX_OPENMM)
 
 if(GMX_FAHCORE)
@@ -89,21 +93,25 @@ if(GMX_OPENMM AND MSVC)
     set_target_properties(mdrun PROPERTIES LINK_FLAGS "/NODEFAULTLIB:LIBCMT")
 endif()
 
-# Construct component groups for installation
-foreach(PROGRAM ${GMX_KERNEL_PROGRAMS} mdrun)
+# Construct component groups for installation; note that a component may
+# belong to only one group
+foreach(PROGRAM ${GMX_KERNEL_PROGRAMS})
     set(CPACK_COMPONENT_${PROGRAM}_GROUP tools)
 endforeach()
 set(CPACK_COMPONENT_MDRUN_GROUP mdrun)
 
-# Create custom install-xxxx targets, component dependences,
-# and trigger the installation
 foreach(PROGRAM ${GMX_KERNEL_PROGRAMS} mdrun)
-    set(CPACK_COMPONENT_${PROGRAM}_DEPENDS libraries)
+    # Manage CPack component dependencies
+    set(CPACK_COMPONENT_${PROGRAM}_DEPENDS libraries libraries-gmxpreprocess)
+
+    # Create custom install-xxxx target
     if (BUILD_SHARED_LIBS)
     # If shared libraries are used, we need to install the libraries in
     # addition to the mdrun binary.
        add_custom_target(install-${PROGRAM}
            COMMAND ${CMAKE_COMMAND} -DCOMPONENT=libraries
+                   -P ${CMAKE_BINARY_DIR}/cmake_install.cmake
+           COMMAND ${CMAKE_COMMAND} -DCOMPONENT=libraries-gmxpreprocess
                    -P ${CMAKE_BINARY_DIR}/cmake_install.cmake
            COMMAND ${CMAKE_COMMAND} -DCOMPONENT=${PROGRAM}
                    -P ${CMAKE_BINARY_DIR}/cmake_install.cmake
@@ -115,6 +123,8 @@ foreach(PROGRAM ${GMX_KERNEL_PROGRAMS} mdrun)
            COMMENT "Installing ${PROGRAM}")
     endif()
     add_dependencies(install-${PROGRAM} ${PROGRAM})
+
+    # Finally, trigger installation
     install(
       TARGETS ${PROGRAM}
       COMPONENT ${PROGRAM}
@@ -122,7 +132,7 @@ foreach(PROGRAM ${GMX_KERNEL_PROGRAMS} mdrun)
       )
 endforeach()
 
-install(TARGETS gmxpreprocess DESTINATION ${LIB_INSTALL_DIR} COMPONENT libraries)
+install(TARGETS gmxpreprocess DESTINATION ${LIB_INSTALL_DIR} COMPONENT libraries-gmxpreprocess)
 
 endif(GMX_FAHCORE)
 
