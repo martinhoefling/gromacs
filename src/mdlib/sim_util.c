@@ -1373,6 +1373,12 @@ void do_force_cutsVERLET(FILE *fplog,t_commrec *cr,
         pull_potential_wrapper(fplog,bSepDVDL,cr,inputrec,box,x,
                                f,vir_force,mdatoms,enerd,lambda,t);
     }
+    
+#ifdef GMX_IMD
+    /* Add forces from interactive molecular dynamics (IMD) */
+    if (inputrec->bIMD)
+        imd_apply_forces(inputrec,cr,f);
+#endif    
 
     if (PAR(cr) && !(cr->duty & DUTY_PME))
     {
