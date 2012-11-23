@@ -764,7 +764,7 @@ void do_force_cutsVERLET(FILE *fplog,t_commrec *cr,
     bNS           = (flags & GMX_FORCE_NS) && (fr->bAllvsAll==FALSE); 
     bFillGrid     = (bNS && bStateChanged);
     bCalcCGCM     = (bFillGrid && !DOMAINDECOMP(cr));
-    bDoLongRange  = (fr->bTwinRange && bNS && (flags & GMX_FORCE_DOLR));
+    bDoLongRange  = (fr->bTwinRange && bNS && (flags & GMX_FORCE_DO_LR));
     bDoForces     = (flags & GMX_FORCE_FORCES);
     bSepLRF       = (bDoLongRange && bDoForces && (flags & GMX_FORCE_SEPLRF));
     bUseGPU       = fr->nbv->bUseGPU;
@@ -1114,20 +1114,13 @@ void do_force_cutsVERLET(FILE *fplog,t_commrec *cr,
             }
         }
 
-        if (bSepLRF)
+        /* Clear the short- and long-range forces */
+        clear_rvecs(fr->natoms_force_constr,f);
+        if(bSepLRF && do_per_step(step,inputrec->nstcalclr))
         {
-            /* Add the long range forces to the short range forces */
-            for(i=0; i<fr->natoms_force_constr; i++)
-            {
-                copy_rvec(fr->f_twin[i],f[i]);
-            }
+            clear_rvecs(fr->natoms_force_constr,fr->f_twin);
         }
-        else if (!(fr->bTwinRange && bNS))
-        {
-            /* Clear the short-range forces */
-            clear_rvecs(fr->natoms_force_constr,f);
-        }
-
+        
         clear_rvec(fr->vir_diag_posres);
 
         GMX_BARRIER(cr->mpi_comm_mygroup);
@@ -1153,13 +1146,25 @@ void do_force_cutsVERLET(FILE *fplog,t_commrec *cr,
     /* if we use the GPU turn off the nonbonded */
     do_force_lowlevel(fplog,step,fr,inputrec,&(top->idef),
                       cr,nrnb,wcycle,mdatoms,&(inputrec->opts),
-                      x,hist,f,enerd,fcd,mtop,top,fr->born,
+                      x,hist,f, bSepLRF ? fr->f_twin : f,enerd,fcd,mtop,top,fr->born,
                       &(top->atomtypes),bBornRadii,box,
                       inputrec->fepvals,lambda,graph,&(top->excls),fr->mu_tot,
                       ((nb_kernel_type == nbk8x8x8_CUDA || nb_kernel_type == nbk8x8x8_PlainC) 
                         ? flags&~GMX_FORCE_NONBONDED : flags),
                       &cycles_pme);
 
+    if(bSepLRF)
+    {
+        if (do_per_step(step,inputrec->nstcalclr))
+        {
+            /* Add the long range forces to the short range forces */
+            for(i=0; i<fr->natoms_force_constr; i++)
+            {
+                rvec_add(fr->f_twin[i],f[i],f[i]);
+            }
+        }
+    }
+    
     if (!bUseOrEmulGPU)
     {
         /* Maybe we should move this into do_force_lowlevel */
@@ -1420,7 +1425,7 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
     int    start,homenr;
     double mu[2*DIM];
     gmx_bool   bSepDVDL,bStateChanged,bNS,bFillGrid,bCalcCGCM,bBS;
-    gmx_bool   bDoLongRange,bDoForces,bSepLRF;
+    gmx_bool   bDoLongRangeNS,bDoForces,bDoPotential,bSepLRF;
     gmx_bool   bDoAdressWF;
     matrix boxs;
     rvec   vzero,box_diag;
@@ -1456,13 +1461,18 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
         }
     }
 
-    bStateChanged = (flags & GMX_FORCE_STATECHANGED);
-    bNS           = (flags & GMX_FORCE_NS) && (fr->bAllvsAll==FALSE);
-    bFillGrid     = (bNS && bStateChanged);
-    bCalcCGCM     = (bFillGrid && !DOMAINDECOMP(cr));
-    bDoLongRange  = (fr->bTwinRange && bNS && (flags & GMX_FORCE_DOLR));
-    bDoForces     = (flags & GMX_FORCE_FORCES);
-    bSepLRF       = (bDoLongRange && bDoForces && (flags & GMX_FORCE_SEPLRF));
+    bStateChanged  = (flags & GMX_FORCE_STATECHANGED);
+    bNS            = (flags & GMX_FORCE_NS) && (fr->bAllvsAll==FALSE);
+    /* Should we update the long-range neighborlists at this step? */
+    bDoLongRangeNS = fr->bTwinRange && bNS;
+    /* Should we perform the long-range nonbonded evaluation inside the neighborsearching? */
+    bFillGrid      = (bNS && bStateChanged);
+    bCalcCGCM      = (bFillGrid && !DOMAINDECOMP(cr));
+    bDoForces      = (flags & GMX_FORCE_FORCES);
+    bDoPotential   = (flags & GMX_FORCE_ENERGY);
+    bSepLRF        = ((inputrec->nstcalclr>1) && bDoForces &&
+                      (flags & GMX_FORCE_SEPLRF) && (flags & GMX_FORCE_DO_LR));
+
     /* should probably move this to the forcerec since it doesn't change */
     bDoAdressWF   = ((fr->adress_type!=eAdressOff));
 
@@ -1623,13 +1633,6 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
             mk_mshift(fplog,graph,fr->ePBC,box,x);
         }
 
-        /* Reset long range forces if necessary */
-        if (fr->bTwinRange)
-        {
-            /* Reset the (long-range) forces if necessary */
-            clear_rvecs(fr->natoms_force_constr,bSepLRF ? fr->f_twin : f);
-        }
-
         /* Do the actual neighbour searching and if twin range electrostatics
          * also do the calculation of long range forces and energies.
          */
@@ -1637,7 +1640,7 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
         ns(fplog,fr,x,box,
            groups,&(inputrec->opts),top,mdatoms,
            cr,nrnb,lambda,dvdlambda,&enerd->grpp,bFillGrid,
-           bDoLongRange,bDoForces,bSepLRF ? fr->f_twin : f);
+           bDoLongRangeNS);
         if (bSepDVDL)
         {
             fprintf(fplog,sepdvdlformat,"LR non-bonded",0.0,dvdlambda);
@@ -1710,20 +1713,13 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
             }
         }
 
-        if (bSepLRF)
+        /* Clear the short- and long-range forces */
+        clear_rvecs(fr->natoms_force_constr,f);
+        if(bSepLRF && do_per_step(step,inputrec->nstcalclr))
         {
-            /* Add the long range forces to the short range forces */
-            for(i=0; i<fr->natoms_force_constr; i++)
-            {
-                copy_rvec(fr->f_twin[i],f[i]);
-            }
+            clear_rvecs(fr->natoms_force_constr,fr->f_twin);
         }
-        else if (!(fr->bTwinRange && bNS))
-        {
-            /* Clear the short-range forces */
-            clear_rvecs(fr->natoms_force_constr,f);
-        }
-
+        
         clear_rvec(fr->vir_diag_posres);
 
         GMX_BARRIER(cr->mpi_comm_mygroup);
@@ -1748,13 +1744,25 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
     /* Compute the bonded and non-bonded energies and optionally forces */
     do_force_lowlevel(fplog,step,fr,inputrec,&(top->idef),
                       cr,nrnb,wcycle,mdatoms,&(inputrec->opts),
-                      x,hist,f,enerd,fcd,mtop,top,fr->born,
+                      x,hist,f, bSepLRF ? fr->f_twin : f,enerd,fcd,mtop,top,fr->born,
                       &(top->atomtypes),bBornRadii,box,
                       inputrec->fepvals,lambda,
                       graph,&(top->excls),fr->mu_tot,
                       flags,
                       &cycles_pme);
 
+    if(bSepLRF)
+    {
+        if (do_per_step(step,inputrec->nstcalclr))
+        {
+            /* Add the long range forces to the short range forces */
+            for(i=0; i<fr->natoms_force_constr; i++)
+            {
+                rvec_add(fr->f_twin[i],f[i],f[i]);
+            }
+        }
+    }
+    
     cycles_force = wallcycle_stop(wcycle,ewcFORCE);
     GMX_BARRIER(cr->mpi_comm_mygroup);
 
@@ -2055,7 +2063,7 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
   double r0,r1,r,rc3,rc9,ea,eb,ec,pa,pb,pc,pd;
   double invscale,invscale2,invscale3;
   int    ri0,ri1,ri,i,offstart,offset;
-  real   scale,*vdwtab;
+  real   scale,*vdwtab,tabfactor,tmp;
 
   fr->enershiftsix = 0;
   fr->enershifttwelve = 0;
@@ -2075,8 +2083,8 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
 		  "With dispersion correction rvdw-switch can not be zero "
 		  "for vdw-type = %s",evdw_names[fr->vdwtype]);
 
-      scale  = fr->nblists[0].tab.scale;
-      vdwtab = fr->nblists[0].vdwtab;
+      scale  = fr->nblists[0].table_elec_vdw.scale;
+      vdwtab = fr->nblists[0].table_vdw.data;
 
       /* Round the cut-offs to exact table values for precision */
       ri0 = floor(fr->rvdw_switch*scale);
@@ -2086,10 +2094,14 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
       rc3 = r0*r0*r0;
       rc9  = rc3*rc3*rc3;
 
-      if (fr->vdwtype == evdwSHIFT) {
-	/* Determine the constant energy shift below rvdw_switch */
-	fr->enershiftsix    = (real)(-1.0/(rc3*rc3)) - vdwtab[8*ri0];
-	fr->enershifttwelve = (real)( 1.0/(rc9*rc3)) - vdwtab[8*ri0 + 4];
+      if (fr->vdwtype == evdwSHIFT)
+      {
+          /* Determine the constant energy shift below rvdw_switch.
+           * Table has a scale factor since we have scaled it down to compensate
+           * for scaling-up c6/c12 with the derivative factors to save flops in analytical kernels.
+           */
+          fr->enershiftsix    = (real)(-1.0/(rc3*rc3)) - 6.0*vdwtab[8*ri0];
+          fr->enershifttwelve = (real)( 1.0/(rc9*rc3)) - 12.0*vdwtab[8*ri0 + 4];
       }
       /* Add the constant part from 0 to rvdw_switch.
        * This integration from 0 to rvdw_switch overcounts the number
@@ -2116,9 +2128,19 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
       for (i=0;i<2;i++) {
         enersum = 0.0; virsum = 0.0;
         if (i==0)
-	  offstart = 0;
-	else
-	  offstart = 4;
+        {
+            offstart = 0;
+            /* Since the dispersion table has been scaled down a factor 6.0 and the repulsion
+             * a factor 12.0 to compensate for the c6/c12 parameters inside nbfp[] being scaled
+             * up (to save flops in kernels), we need to correct for this.
+             */
+            tabfactor = 6.0;
+        }
+        else
+        {
+            offstart = 4;
+            tabfactor = 12.0;
+        }
 	for (ri=ri0; ri<ri1; ri++) {
           r = ri*invscale;
           ea = invscale3;
@@ -2130,22 +2152,19 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
           pc = 3.0*invscale*r*r;
           pd = r*r*r;
 
-          /* this "8" is from the packing in the vdwtab array - perhaps
-	    should be #define'ed? */
+          /* this "8" is from the packing in the vdwtab array - perhaps should be #define'ed? */
           offset = 8*ri + offstart;
           y0 = vdwtab[offset];
-          f = vdwtab[offset+1];
-          g = vdwtab[offset+2];
-          h = vdwtab[offset+3];
+          f  = vdwtab[offset+1];
+          g  = vdwtab[offset+2];
+          h  = vdwtab[offset+3];
 
-          enersum += y0*(ea/3 + eb/2 + ec) + f*(ea/4 + eb/3 + ec/2)+
-            g*(ea/5 + eb/4 + ec/3) + h*(ea/6 + eb/5 + ec/4);
-          virsum  +=  f*(pa/4 + pb/3 + pc/2 + pd) +
-            2*g*(pa/5 + pb/4 + pc/3 + pd/2) + 3*h*(pa/6 + pb/5 + pc/4 + pd/3);
-
+          enersum += y0*(ea/3 + eb/2 + ec) + f*(ea/4 + eb/3 + ec/2) + g*(ea/5 + eb/4 + ec/3) + h*(ea/6 + eb/5 + ec/4);
+          virsum  += f*(pa/4 + pb/3 + pc/2 + pd) + 2*g*(pa/5 + pb/4 + pc/3 + pd/2) + 3*h*(pa/6 + pb/5 + pc/4 + pd/3);
         }
-        enersum *= 4.0*M_PI;
-        virsum  *= 4.0*M_PI;
+          
+        enersum *= 4.0*M_PI*tabfactor;
+        virsum  *= 4.0*M_PI*tabfactor;
         eners[i] -= enersum;
         virs[i]  -= virsum;
       }
@@ -2165,7 +2184,7 @@ void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr)
       /* Contribution beyond the cut-off */
       eners[0] += -4.0*M_PI/(3.0*rc3);
       eners[1] +=  4.0*M_PI/(9.0*rc9);
-      if (fr->vdw_pot_shift) {
+      if (fr->vdw_modifier==eintmodPOTSHIFT) {
           /* Contribution within the cut-off */
           eners[0] += -4.0*M_PI/(3.0*rc3);
           eners[1] +=  4.0*M_PI/(3.0*rc9);

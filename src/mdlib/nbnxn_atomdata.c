@@ -481,8 +481,8 @@ void nbnxn_atomdata_init(FILE *fp,
      */
     for(i=0; i<ntype; i++)
     {
-        c6  = nbfp[(i*ntype+i)*2  ];
-        c12 = nbfp[(i*ntype+i)*2+1];
+        c6  = nbfp[(i*ntype+i)*2  ]/6.0;
+        c12 = nbfp[(i*ntype+i)*2+1]/12.0;
         if (c6 > 0 && c12 > 0)
         {
             nbat->nbfp_comb[i*2  ] = pow(c12/c6,1.0/6.0);
@@ -506,18 +506,22 @@ void nbnxn_atomdata_init(FILE *fp,
         {
             if (i < ntype && j < ntype)
             {
-                /* We store the prefactor in the derivative of the potential
-                 * in the parameter to avoid multiplications in the inner loop.
+                /* fr->nbfp has been updated, so that array too now stores c6/c12 including
+                 * the 6.0/12.0 prefactors to save 2 flops in the most common case (force-only).
                  */
                 c6  = nbfp[(i*ntype+j)*2  ];
                 c12 = nbfp[(i*ntype+j)*2+1];
-                nbat->nbfp[(i*nbat->ntype+j)*2  ] =  6.0*c6;
-                nbat->nbfp[(i*nbat->ntype+j)*2+1] = 12.0*c12;
+                nbat->nbfp[(i*nbat->ntype+j)*2  ] = c6;
+                nbat->nbfp[(i*nbat->ntype+j)*2+1] = c12;
 
+                /* Compare 6*C6 and 12*C12 for geometric cobination rule */
                 bCombGeom = bCombGeom &&
                     gmx_within_tol(c6*c6  ,nbfp[(i*ntype+i)*2  ]*nbfp[(j*ntype+j)*2  ],tol) &&
                     gmx_within_tol(c12*c12,nbfp[(i*ntype+i)*2+1]*nbfp[(j*ntype+j)*2+1],tol);
 
+                /* Compare C6 and C12 for Lorentz-Berthelot combination rule */
+                c6  /= 6.0;
+                c12 /= 12.0;
                 bCombLB = bCombLB &&
                     ((c6 == 0 && c12 == 0 &&
                       (nbat->nbfp_comb[i*2+1] == 0 || nbat->nbfp_comb[j*2+1] == 0)) ||
@@ -617,9 +621,13 @@ void nbnxn_atomdata_init(FILE *fp,
     if (!simple)
     {
         /* Energy groups not supported yet for super-sub lists */
+        if (n_energygroups > 1 && fp != NULL)
+        {
+            fprintf(fp,"\nNOTE: With GPUs, reporting energy group contributions is not supported\n\n");
+        }
         nbat->nenergrp = 1;
     }
-    /* Temporary storage goes is #grp^3*8 real, so limit to 64 */
+    /* Temporary storage goes as #grp^3*simd_width^2/2, so limit to 64 */
     if (nbat->nenergrp > 64)
     {
         gmx_fatal(FARGS,"With NxN kernels not more than 64 energy groups are supported\n");
@@ -793,7 +801,7 @@ static void copy_egp_to_nbat_egps(const int *a,int na,int na_round,
     j = 0;
     for(i=0; i<na; i+=na_c)
     {
-        /* Store na_c energy groups number into one int */
+        /* Store na_c energy group numbers into one int */
         comb = 0;
         for(sa=0; sa<na_c; sa++)
         {
@@ -956,6 +964,61 @@ void nbnxn_atomdata_copy_x_to_nbat_x(const nbnxn_search_t nbs,
     }
 }
 
+static void
+nbnxn_atomdata_reduce_reals(real * gmx_restrict dest,
+                            real ** gmx_restrict src,
+                            int nsrc,
+                            int i0, int i1)
+{
+    int i,s;
+
+    for(i=i0; i<i1; i++)
+    {
+        for(s=0; s<nsrc; s++)
+        {
+            dest[i] += src[s][i];
+        }
+    }
+}
+
+static void
+nbnxn_atomdata_reduce_reals_x86_simd(real * gmx_restrict dest,
+                                     real ** gmx_restrict src,
+                                     int nsrc,
+                                     int i0, int i1)
+{
+#ifdef NBNXN_SEARCH_SSE
+/* We can use AVX256 here, but not when AVX128 kernels are selected.
+ * As this reduction is not faster with AVX256 anyway, we use 128-bit SIMD.
+ */
+#define GMX_MM128_HERE
+#include "gmx_x86_simd_macros.h"
+
+    int       i,s;
+    gmx_mm_pr dest_SSE,src_SSE;
+
+    if ((i0 & (GMX_X86_SIMD_WIDTH_HERE-1)) ||
+        (i1 & (GMX_X86_SIMD_WIDTH_HERE-1)))
+    {
+        gmx_incons("bounds not a multiple of GMX_X86_SIMD_WIDTH_HERE in nbnxn_atomdata_reduce_reals_x86_simd");
+    }
+
+    for(i=i0; i<i1; i+=GMX_X86_SIMD_WIDTH_HERE)
+    {
+        dest_SSE = gmx_load_pr(dest+i);
+        for(s=0; s<nsrc; s++)
+        {
+            src_SSE  = gmx_load_pr(src[s]+i);
+            dest_SSE = gmx_add_pr(dest_SSE,src_SSE);
+        }
+        gmx_store_pr(dest+i,dest_SSE);
+    }
+
+#undef GMX_MM128_HERE
+#undef GMX_MM256_HERE
+#endif
+}
+
 /* Add part of the force array(s) from nbnxn_atomdata_t to f */
 static void
 nbnxn_atomdata_add_nbat_f_to_f_part(const nbnxn_search_t nbs,
@@ -1073,6 +1136,7 @@ void nbnxn_atomdata_add_nbat_f_to_f(const nbnxn_search_t nbs,
 {
     int a0=0,na=0;
     int nth,th;
+    gmx_bool bStreamingReduce;
 
     nbs_cycle_start(&nbs->cc[enbsCCreducef]);
 
@@ -1093,15 +1157,104 @@ void nbnxn_atomdata_add_nbat_f_to_f(const nbnxn_search_t nbs,
     }
 
     nth = gmx_omp_nthreads_get(emntNonbonded);
+
+    /* Using the two-step streaming reduction is probably always faster */
+    bStreamingReduce = (nbat->nout > 1);
+
+    if (bStreamingReduce)
+    {
+        /* Reduce the force thread output buffers into buffer 0, before adding
+         * them to the, differently ordered, "real" force buffer.
+         */
+#pragma omp parallel for num_threads(nth) schedule(static)
+        for(th=0; th<nth; th++)
+        {
+            int g0,g1,g;
+
+            /* For which grids should we reduce the force output? */
+            g0 = ((locality==eatLocal || locality==eatAll) ? 0 : 1);
+            g1 = (locality==eatLocal ? 1 : nbs->ngrid);
+
+            for(g=g0; g<g1; g++)
+            {
+                nbnxn_grid_t *grid;
+                int b0,b1,b;
+                int c0,c1,i0,i1;
+                int nfptr;
+                real *fptr[NBNXN_CELLBLOCK_MAX_THREADS];
+                int out;
+
+                grid = &nbs->grid[g];
+
+                /* Calculate the cell-block range for our thread */
+                b0 = (grid->cellblock_flags.ncb* th   )/nth;
+                b1 = (grid->cellblock_flags.ncb*(th+1))/nth;
+
+                if (grid->cellblock_flags.bUse)
+                {
+                    for(b=b0; b<b1; b++)
+                    {
+                        c0 = b*NBNXN_CELLBLOCK_SIZE;
+                        c1 = min(c0 + NBNXN_CELLBLOCK_SIZE,grid->nc);
+                        i0 = (grid->cell0 + c0)*grid->na_c*nbat->fstride;
+                        i1 = (grid->cell0 + c1)*grid->na_c*nbat->fstride;
+
+                        nfptr = 0;
+                        for(out=1; out<nbat->nout; out++)
+                        {
+                            if (grid->cellblock_flags.flag[b] & (1U<<out))
+                            {
+                                fptr[nfptr++] = nbat->out[out].f;
+                            }
+                        }
+                        if (nfptr > 0)
+                        {
+#ifdef NBNXN_SEARCH_SSE
+                            nbnxn_atomdata_reduce_reals_x86_simd
+#else
+                            nbnxn_atomdata_reduce_reals
+#endif
+                                                       (nbat->out[0].f,
+                                                        fptr,nfptr,
+                                                        i0,i1);
+                        }
+                    }
+                }
+                else
+                {
+                    c0 = b0*NBNXN_CELLBLOCK_SIZE;
+                    c1 = min(b1*NBNXN_CELLBLOCK_SIZE,grid->nc);
+                    i0 = (grid->cell0 + c0)*grid->na_c*nbat->fstride;
+                    i1 = (grid->cell0 + c1)*grid->na_c*nbat->fstride;
+
+                    nfptr = 0;
+                    for(out=1; out<nbat->nout; out++)
+                    {
+                        fptr[nfptr++] = nbat->out[out].f;
+                    }
+
+#ifdef NBNXN_SEARCH_SSE
+                    nbnxn_atomdata_reduce_reals_x86_simd
+#else
+                    nbnxn_atomdata_reduce_reals
+#endif
+                                               (nbat->out[0].f,
+                                                fptr,nfptr,
+                                                i0,i1);
+                }
+            }
+        }
+    }
+
 #pragma omp parallel for num_threads(nth) schedule(static)
     for(th=0; th<nth; th++)
     {
         nbnxn_atomdata_add_nbat_f_to_f_part(nbs,nbat,
-                                             nbat->out,
-                                             nbat->nout,
-                                             a0+((th+0)*na)/nth,
-                                             a0+((th+1)*na)/nth,
-                                             f);
+                                            nbat->out,
+                                            bStreamingReduce ? 1 : nbat->nout,
+                                            a0+((th+0)*na)/nth,
+                                            a0+((th+1)*na)/nth,
+                                            f);
     }
 
     nbs_cycle_stop(&nbs->cc[enbsCCreducef]);
