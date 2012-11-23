@@ -28,8 +28,8 @@
 /* Version number of package (translate from cmake to autoconf macro name) */
 #define VERSION  "@PROJECT_VERSION@"
 
-/* Use the version string from generated version.h */
-#cmakedefine USE_VERSION_H
+/* Use extra version information generated with git */
+#cmakedefine GMX_GIT_VERSION_INFO
 
 /* Default location of data files */
 #define GMXLIBDIR "@GMXLIBDIR@"
@@ -118,20 +118,32 @@
 /* Use AMD core math library */
 #cmakedefine GMX_FFT_ACML
 
-/* What type of acceleration is used? (string, for dumping to files) */
-#define GMX_ACCELERATION "@GMX_ACCELERATION@"
-
-/* SSE2 acceleration */
+/* SSE2 instructions available */
 #cmakedefine GMX_X86_SSE2
 
-/* SSE4.1 acceleration */
+/* SSE4.1 instructions available */
 #cmakedefine GMX_X86_SSE4_1
 
-/* AVX 128-bit acceleration with FMA, useful on modern AMD hardware */
+/* AVX 128-bit FMA instructions available */
 #cmakedefine GMX_X86_AVX_128_FMA
 
-/* AVX 256-bit acceleration, usually for intel hardware */
+/* AVX 256-bit instructions available */
 #cmakedefine GMX_X86_AVX_256
+
+/* SSE2 was selected as CPU acceleration level */
+#cmakedefine GMX_CPU_ACCELERATION_X86_SSE2
+
+/* SSE4.1 was selected as CPU acceleration level */
+#cmakedefine GMX_CPU_ACCELERATION_X86_SSE4_1
+
+/* AVX 128-bit FMA was selected as CPU acceleration level */
+#cmakedefine GMX_CPU_ACCELERATION_X86_AVX_128_FMA
+
+/* AVX 256-bit was selected as CPU acceleration level */
+#cmakedefine GMX_CPU_ACCELERATION_X86_AVX_256
+
+/* String for CPU acceleration choice (for writing to log files and stdout) */
+#define GMX_CPU_ACCELERATION_STRING "@GMX_CPU_ACCELERATION@"
 
 /* Integer byte order is big endian. */
 #cmakedefine GMX_INTEGER_BIG_ENDIAN 
@@ -154,9 +166,6 @@
 
 /* Use OpenMP multithreading */
 #cmakedefine GMX_OPENMP
-
-/* Use old threading (domain decomp force calc) code */
-#cmakedefine GMX_THREAD_SHM_FDECOMP 
 
 /* Ignore calls to nice(3) */
 #cmakedefine GMX_NO_NICE
@@ -278,6 +287,15 @@
 /* Define to 1 if you have the sigaction() function. */
 #cmakedefine HAVE_SIGACTION
 
+/* Define to 1 if you have the rsqrt() function. */
+#cmakedefine HAVE_RSQRT
+
+/* Define to 1 if you have the rsqrtf() function. */
+#cmakedefine HAVE_RSQRTF
+
+/* Define to 1 if you have the sqrtf() function. */
+#cmakedefine HAVE_SQRTF
+
 /* Define to 1 if yo have the <unistd.h> header file. */
 #cmakedefine HAVE_UNISTD_H
 
@@ -296,6 +314,9 @@
 /* Define to 1 if you have the <x86intrin.h> header file */
 #cmakedefine HAVE_X86INTRIN_H
 
+/* Define to 1 if you have the <intrin.h> header file */
+#cmakedefine HAVE_INTRIN_H
+
 /* Define to 1 if you have the <sched.h> header */
 #cmakedefine HAVE_SCHED_H
 
@@ -307,6 +328,9 @@
 
 /* Define to 1 if you have the sysconf() function */
 #cmakedefine HAVE_SYSCONF
+
+/* Define to 1 if you have the sched_getaffinity() function */
+#cmakedefine HAVE_SCHED_GETAFFINITY
 
 /* Define to 1 if you have the sched_setaffinity() function */
 #cmakedefine HAVE_SCHED_SETAFFINITY
@@ -348,11 +372,23 @@
 #cmakedefine _FILE_OFFSET_BITS @_FILE_OFFSET_BITS@
 
 /* Define to __inline__ or __inline if that is what the C compiler
-   calls it, or to nothing if inline is not supported under any name.  */
+   calls it, or to nothing if inline is not supported under any name.
+   Please do NOT remove the gmx_inline keyword from here. The classical
+   C++ inline keyword is merely a recommendation to the compiler, and
+   many compilers support stronger alternatives (e.g. __forceinline)
+   that we might want to use. */
+#define gmx_inline ${INLINE_KEYWORD}
 #ifndef __cplusplus
 #define inline ${INLINE_KEYWORD}
 #endif
 
+/* Define to __restrict__ or __restrict if that is what the C compiler
+   calls it, unless we are on C99 when it is simply called restrict.
+   Since restrict is a reserved key word in C99 we are not allowed to
+   redefine the word itself, so call this gmx_restrict to avoid having
+   to identify the language standard level. If it is not supported, it
+   is still defined to an empty string here. */
+#define gmx_restrict ${RESTRICT_KEYWORD}
 /* Build special-purpose mdrun library */
 #cmakedefine GMX_FAHCORE   
 

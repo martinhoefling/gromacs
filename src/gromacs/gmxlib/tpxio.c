@@ -73,11 +73,8 @@
 static const char *tpx_tag = TPX_TAG_RELEASE;
 
 /* This number should be increased whenever the file format changes! */
-<<<<<<< HEAD
-static const int tpx_version = 81;
-=======
-static const int tpx_version = 90;
->>>>>>> master
+static const int tpx_version = 92;
+
 
 /* This number should only be increased when you edit the TOPOLOGY section
  * or the HEADER of the tpx format.
@@ -699,7 +696,16 @@ static void do_inputrec(t_fileio *fio, t_inputrec *ir,gmx_bool bRead,
     if (file_version >= 67) {
       gmx_fio_do_real(fio,ir->rlistlong);
     }
-    gmx_fio_do_int(fio,ir->coulombtype); 
+    if(file_version >= 82 && file_version != 90)
+    {
+        gmx_fio_do_int(fio,ir->nstcalclr);
+    }
+    else
+    {
+        /* Calculate at NS steps */
+        ir->nstcalclr = ir->nstlist;
+    }
+    gmx_fio_do_int(fio,ir->coulombtype);
     if (file_version < 32 && ir->coulombtype == eelRF)
       ir->coulombtype = eelRF_NEC;      
     if (file_version >= 81)
@@ -1114,7 +1120,7 @@ static void do_inputrec(t_fileio *fio, t_inputrec *ir,gmx_bool bRead,
     }
     
     /* Interactive molecular dynamics */
-    if (file_version >= 80) {
+    if (file_version >= 92) {
         gmx_fio_do_int(fio,ir->bIMD);
         if (ir->bIMD == TRUE) {
             if (bRead)

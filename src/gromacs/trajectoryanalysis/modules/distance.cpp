@@ -37,12 +37,8 @@
  */
 #include "distance.h"
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include "pbc.h"
-#include "vec.h"
+#include "gromacs/legacyheaders/pbc.h"
+#include "gromacs/legacyheaders/vec.h"
 
 #include "gromacs/analysisdata/analysisdata.h"
 #include "gromacs/analysisdata/modules/plot.h"

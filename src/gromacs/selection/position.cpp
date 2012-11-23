@@ -35,15 +35,11 @@
  * \author Teemu Murtola <teemu.murtola@cbr.su.se>
  * \ingroup module_selection
  */
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include <string.h>
 
-#include "smalloc.h"
-#include "typedefs.h"
-#include "vec.h"
+#include "gromacs/legacyheaders/smalloc.h"
+#include "gromacs/legacyheaders/typedefs.h"
+#include "gromacs/legacyheaders/vec.h"
 
 #include "gromacs/selection/indexutil.h"
 #include "gromacs/selection/position.h"

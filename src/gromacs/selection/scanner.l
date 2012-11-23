@@ -43,11 +43,7 @@
  * \ingroup module_selection
  */
 %{
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <string2.h>
+#include "gromacs/legacyheaders/string2.h"
 
 #include "parser.h"
 #include "scanner.h"

@@ -258,7 +258,7 @@ typedef struct gmx_domdec_comm
 
     /* Cell sizes for static load balancing, first index cartesian */
     real **slb_frac;
-    
+
     /* The width of the communicated boundaries */
     real cutoff_mbody;
     real cutoff;
@@ -5015,7 +5015,7 @@ static double force_flop_count(t_nrnb *nrnb)
     const char *name;
 
     sum = 0;
-    for(i=eNR_NBKERNEL010; i<eNR_NBKERNEL_FREE_ENERGY; i++)
+    for(i=0; i<eNR_NBKERNEL_FREE_ENERGY; i++)
     {
         /* To get closer to the real timings, we half the count
          * for the normal loops and again half it for water loops.
@@ -7306,7 +7306,11 @@ gmx_bool change_dd_cutoff(t_commrec *cr,t_state *state,t_inputrec *ir,
 
     if (dd->comm->eDLB != edlbNO)
     {
-        if (check_grid_jump(0,dd,cutoff_req,&ddbox,FALSE))
+        /* If DLB is not active yet, we don't need to check the grid jumps.
+         * Actually we shouldn't, because then the grid jump data is not set.
+         */
+        if (dd->comm->bDynLoadBal &&
+            check_grid_jump(0,dd,cutoff_req,&ddbox,FALSE))
         {
             LocallyLimited = 1; 
         }
@@ -9465,6 +9469,12 @@ void dd_partition_system(FILE            *fplog,
 
     /* Now we have the charges we can sort the FE interactions */
     dd_sort_local_top(dd,mdatoms,top_local);
+
+    if (vsite != NULL)
+    {
+        /* Now we have updated mdatoms, we can do the last vsite bookkeeping */
+        split_vsites_over_threads(top_local->idef.il,mdatoms,FALSE,vsite);
+    }
 
     if (shellfc)
     {

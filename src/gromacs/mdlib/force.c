@@ -79,9 +79,7 @@ void ns(FILE *fp,
         real       *dvdlambda,
         gmx_grppairener_t *grppener,
         gmx_bool       bFillGrid,
-        gmx_bool       bDoLongRange,
-        gmx_bool       bDoForces,
-        rvec       *f)
+        gmx_bool       bDoLongRangeNS)
 {
   char   *ptr;
   int    nsearch;
@@ -97,8 +95,7 @@ void ns(FILE *fp,
 
     nsearch = search_neighbours(fp,fr,x,box,top,groups,cr,nrnb,md,
                                 lambda,dvdlambda,grppener,
-                                bFillGrid,bDoLongRange,
-                                bDoForces,f);
+                                bFillGrid,bDoLongRangeNS,TRUE);
   if (debug)
     fprintf(debug,"nsearch = %d\n",nsearch);
 
@@ -144,6 +141,7 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
                        t_grpopts  *opts,
                        rvec       x[],      history_t  *hist,
                        rvec       f[],
+                       rvec       f_longrange[],
                        gmx_enerdata_t *enerd,
                        t_fcdata   *fcd,
                        gmx_mtop_t     *mtop,
@@ -255,18 +253,25 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
     if (flags & GMX_FORCE_NONBONDED)
     {
         donb_flags = 0;
+        /* Add short-range interactions */
+        donb_flags |= GMX_NONBONDED_DO_SR;
+
         if (flags & GMX_FORCE_FORCES)
         {
-            donb_flags |= GMX_DONB_FORCES;
+            donb_flags |= GMX_NONBONDED_DO_FORCE;
+        }
+        if (flags & GMX_FORCE_ENERGY)
+        {
+            donb_flags |= GMX_NONBONDED_DO_POTENTIAL;
+        }
+        if (flags & GMX_FORCE_DO_LR)
+        {
+            donb_flags |= GMX_NONBONDED_DO_LR;
         }
 
         wallcycle_sub_start(wcycle, ewcsNONBONDED);
-        do_nonbonded(cr,fr,x,f,md,excl,
-                    fr->bBHAM ?
-                    enerd->grpp.ener[egBHAMSR] :
-                    enerd->grpp.ener[egLJSR],
-                    enerd->grpp.ener[egCOULSR],
-                    enerd->grpp.ener[egGB],box_size,nrnb,
+        do_nonbonded(cr,fr,x,f,f_longrange,md,excl,
+                    &enerd->grpp,box_size,nrnb,
                     lambda,dvdl_nb,-1,-1,donb_flags);
         wallcycle_sub_stop(wcycle, ewcsNONBONDED);
     }
@@ -286,14 +291,10 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
                 lam_i[j] = (i==0 ? lambda[j] : fepvals->all_lambda[j][i-1]);
             }
             reset_enerdata(&ir->opts,fr,TRUE,&ed_lam,FALSE);
-            do_nonbonded(cr,fr,x,f,md,excl,
-                         fr->bBHAM ?
-                         ed_lam.grpp.ener[egBHAMSR] :
-                         ed_lam.grpp.ener[egLJSR],
-                         ed_lam.grpp.ener[egCOULSR],
-                         enerd->grpp.ener[egGB], box_size,nrnb,
+            do_nonbonded(cr,fr,x,f,f_longrange,md,excl,
+                         &(ed_lam.grpp), box_size,nrnb,
                          lam_i,dvdl_dum,-1,-1,
-                         GMX_DONB_FOREIGNLAMBDA);
+                         GMX_NONBONDED_DO_FOREIGNLAMBDA | GMX_NONBONDED_DO_SR);
             sum_epot(&ir->opts,&ed_lam);
             enerd->enerpart_lambda[i] += ed_lam.term[F_EPOT];
         }
@@ -538,6 +539,7 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
         }
 
         status = 0;
+        Vlr  = 0;
         dvdl = 0;
         switch (fr->eeltype)
         {
@@ -599,12 +601,6 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
                 }
                 PRINT_SEPDVDL("PME mesh",Vlr,dvdl);
             }
-            else
-            {
-                /* Energies and virial are obtained later from the PME nodes */
-                /* but values have to be zeroed out here */
-                Vlr=0.0;
-            }
             break;
         case eelEWALD:
             Vlr = do_ewald(fplog,FALSE,ir,x,fr->f_novirsum,
@@ -615,7 +611,6 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
             PRINT_SEPDVDL("Ewald long-range",Vlr,dvdl);
             break;
         default:
-            Vlr = 0;
             gmx_fatal(FARGS,"No such electrostatics method implemented %s",
                       eel_names[fr->eeltype]);
         }
@@ -624,6 +619,7 @@ void do_force_lowlevel(FILE       *fplog,   gmx_large_int_t step,
             gmx_fatal(FARGS,"Error %d in long range electrostatics routine %s",
                       status,EELTYPE(fr->eeltype));
 		}
+        /* Note that with separate PME nodes we get the real energies later */
         enerd->dvdl_lin[efptCOUL] += dvdl;
         enerd->term[F_COUL_RECIP] = Vlr + Vcorr;
         if (debug)

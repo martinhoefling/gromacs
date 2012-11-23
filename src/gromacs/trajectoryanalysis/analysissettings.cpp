@@ -35,15 +35,12 @@
  * \author Teemu Murtola <teemu.murtola@cbr.su.se>
  * \ingroup module_trajectoryanalysis
  */
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
+#include "analysissettings.h"
 
-#include "smalloc.h"
-#include "statutil.h"
-#include "vec.h"
+#include "gromacs/legacyheaders/smalloc.h"
+#include "gromacs/legacyheaders/statutil.h"
+#include "gromacs/legacyheaders/vec.h"
 
-#include "gromacs/trajectoryanalysis/analysissettings.h"
 #include "gromacs/utility/exceptions.h"
 
 #include "analysissettings-impl.h"
