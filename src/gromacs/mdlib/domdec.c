@@ -53,14 +53,10 @@
 #include "gmx_ga2la.h"
 #include "gmx_sort.h"
 #include "macros.h"
-<<<<<<< HEAD
 #include "imd.h"
-
-=======
 #include "nbnxn_search.h"
 #include "bondf.h"
 #include "gmx_omp_nthreads.h"
->>>>>>> master
 
 #ifdef GMX_LIB_MPI
 #include <mpi.h>

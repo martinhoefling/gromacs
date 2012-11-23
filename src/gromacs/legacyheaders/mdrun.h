@@ -81,14 +81,11 @@ extern "C" {
 #define MD_READ_EKIN      (1<<17)
 #define MD_STARTFROMCPT   (1<<18)
 #define MD_RESETCOUNTERSHALFWAY (1<<19)
-<<<<<<< HEAD
 #define MD_IMDWAIT        (1<<20)
 #define MD_IMDTERM        (1<<21)
 #define MD_IMDPULL        (1<<22)
-=======
 #define MD_TUNEPME        (1<<20)
 #define MD_TESTVERLET     (1<<22)
->>>>>>> master
 
 enum {
   ddnoSEL, ddnoINTERLEAVE, ddnoPP_PME, ddnoCARTESIAN, ddnoNR
@@ -170,148 +167,6 @@ gmx_integrator_t do_nm;
 gmx_integrator_t do_tpi;
 /* Do test particle insertion */
 
-<<<<<<< HEAD
-
-/* ROUTINES from md_support.c */
-
-/* return the number of steps between global communcations */
-int check_nstglobalcomm(FILE *fplog,t_commrec *cr,
-                        int nstglobalcomm,t_inputrec *ir);
-
-/* check whether an 'nst'-style parameter p is a multiple of nst, and
-   set it to be one if not, with a warning. */
-void check_nst_param(FILE *fplog,t_commrec *cr,
-                     const char *desc_nst,int nst,
-                     const char *desc_p,int *p);
-
-/* check which of the multisim simulations has the shortest number of
-   steps and return that number of nsteps */
-gmx_large_int_t get_multisim_nsteps(const t_commrec *cr,
-                                    gmx_large_int_t nsteps);
-
-void rerun_parallel_comm(t_commrec *cr,t_trxframe *fr,
-                         gmx_bool *bNotLastFrame);
-
-/* get the conserved energy associated with the ensemble type*/
-real compute_conserved_from_auxiliary(t_inputrec *ir, t_state *state,           
-                                      t_extmass *MassQ);
-
-/* set the lambda values at each step of mdrun when they change */
-void set_current_lambdas(gmx_large_int_t step, t_lambda *fepvals, gmx_bool bRerunMD,
-                         t_trxframe *rerun_fr, t_state *state_global, t_state *state, double lam0[]);
-
-/* reset all cycle and time counters. */
-void reset_all_counters(FILE *fplog,t_commrec *cr,
-                        gmx_large_int_t step,
-                        gmx_large_int_t *step_rel,t_inputrec *ir,
-                        gmx_wallcycle_t wcycle,t_nrnb *nrnb,
-                        gmx_runtime_t *runtime);
-
-
-
-/* ROUTINES from sim_util.c */
-void do_pbc_first(FILE *log,matrix box,t_forcerec *fr,
-			 t_graph *graph,rvec x[]);
-
-void do_pbc_first_mtop(FILE *fplog,int ePBC,matrix box,
-			      gmx_mtop_t *mtop,rvec x[]);
-
-void do_pbc_mtop(FILE *fplog,int ePBC,matrix box,
-			gmx_mtop_t *mtop,rvec x[]);
-
-
-		     
-/* ROUTINES from stat.c */
-gmx_global_stat_t global_stat_init(t_inputrec *ir);
-
-void global_stat_destroy(gmx_global_stat_t gs);
-
-void global_stat(FILE *log,gmx_global_stat_t gs,
-			t_commrec *cr,gmx_enerdata_t *enerd,
-			tensor fvir,tensor svir,rvec mu_tot,
-			t_inputrec *inputrec,
-			gmx_ekindata_t *ekind,
-			gmx_constr_t constr,t_vcm *vcm,
-			int nsig,real *sig,
-			gmx_mtop_t *top_global, t_state *state_local, 
-			gmx_bool bSumEkinhOld, int flags);
-/* Communicate statistics over cr->mpi_comm_mysim */
-
-gmx_mdoutf_t *init_mdoutf(int nfile,const t_filenm fnm[],
-				 int mdrun_flags,
-				 const t_commrec *cr,const t_inputrec *ir,
-				 const output_env_t oenv);
-/* Returns a pointer to a data structure with all output file pointers
- * and names required by mdrun.
- */
-
-void done_mdoutf(gmx_mdoutf_t *of);
-/* Close all open output files and free the of pointer */
-
-#define MDOF_X   (1<<0)
-#define MDOF_V   (1<<1)
-#define MDOF_F   (1<<2)
-#define MDOF_XTC (1<<3)
-#define MDOF_CPT (1<<4)
-#define MDOF_IMD (1<<5)
-
-void write_traj(FILE *fplog,t_commrec *cr,
-		       gmx_mdoutf_t *of,
-		       int mdof_flags,
-		       gmx_mtop_t *top_global,
-		       gmx_large_int_t step,double t,
-		       t_state *state_local,t_state *state_global,
-		       rvec *f_local,rvec *f_global,
-		       int *n_xtc,rvec **x_xtc);
-/* Routine that writes frames to trn, xtc and/or checkpoint.
- * What is written is determined by the mdof_flags defined above.
- * Data is collected to the master node only when necessary.
- */
-
-int do_per_step(gmx_large_int_t step,gmx_large_int_t nstep);
-/* Return TRUE if io should be done */
-
-int do_any_io(int step, t_inputrec *ir);
-
-/* ROUTINES from sim_util.c */
-
-double gmx_gettime();
-
-void print_time(FILE *out, gmx_runtime_t *runtime,
-                       gmx_large_int_t step,t_inputrec *ir, t_commrec *cr);
-
-void runtime_start(gmx_runtime_t *runtime);
-
-void runtime_end(gmx_runtime_t *runtime);
-
-void runtime_upd_proc(gmx_runtime_t *runtime);
-/* The processor time should be updated every once in a while,
- * since on 32-bit manchines it loops after 72 minutes.
- */
-  
-void print_date_and_time(FILE *log,int pid,const char *title,
-				const gmx_runtime_t *runtime);
-  
-void nstop_cm(FILE *log,t_commrec *cr,
-		     int start,int nr_atoms,real mass[],rvec x[],rvec v[]);
-
-void finish_run(FILE *log,t_commrec *cr,const char *confout,
-		       t_inputrec *inputrec,
-		       t_nrnb nrnb[],gmx_wallcycle_t wcycle,
-		       gmx_runtime_t *runtime,
-		       gmx_bool bWriteStat);
-
-void calc_enervirdiff(FILE *fplog,int eDispCorr,t_forcerec *fr);
-
-void calc_dispcorr(FILE *fplog,t_inputrec *ir,t_forcerec *fr,
-                   gmx_large_int_t step, int natoms,
-                   matrix box,real lambda,tensor pres,tensor virial,
-                   real *prescorr, real *enercorr, real *dvdlcorr);
-
-void initialize_lambdas(FILE *fplog,t_inputrec *ir,int *fep_state,real *lambda,double *lam0);
-
-=======
->>>>>>> master
 void init_npt_masses(t_inputrec *ir, t_state *state, t_extmass *MassQ, gmx_bool bInit);
 
 int ExpandedEnsembleDynamics(FILE *log,t_inputrec *ir, gmx_enerdata_t *enerd,

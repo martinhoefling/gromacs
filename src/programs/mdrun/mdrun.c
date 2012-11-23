@@ -510,12 +510,9 @@ int main(int argc,char *argv[])
   int  repl_ex_nex=0;
   int  nstepout=100;
   int  resetstep=-1;
-<<<<<<< HEAD
   int  imdport=8888;
   int  imdfreq=-1;
-=======
   int  nsteps=-2; /* the value -2 means that the mdp option will be used */
->>>>>>> master
   
   rvec realddxyz={0,0,0};
   const char *ddno_opt[ddnoNR+1] =
@@ -689,10 +686,6 @@ int main(int argc,char *argv[])
   dd_node_order = nenum(ddno_opt);
   cr->npmenodes = npme;
 
-<<<<<<< HEAD
-#ifndef GMX_THREAD_MPI
-  nthreads=1;
-#endif
 
 #ifdef GMX_IMD
   /* we check the imd integer options and set them to 0 if the switch is not set */
@@ -704,8 +697,7 @@ int main(int argc,char *argv[])
   }
 #endif
 
-=======
->>>>>>> master
+
   /* now check the -multi and -multidir option */
   if (opt2bSet("-multidir", NFILE, fnm))
   {
@@ -837,15 +829,10 @@ int main(int argc,char *argv[])
   rc = mdrunner(&hw_opt, fplog,cr,NFILE,fnm,oenv,bVerbose,bCompact,
                 nstglobalcomm, ddxyz,dd_node_order,rdd,rconstr,
                 dddlb_opt[0],dlb_scale,ddcsx,ddcsy,ddcsz,
-<<<<<<< HEAD
-                nstepout,resetstep,nmultisim,repl_ex_nst,repl_ex_nex,repl_ex_seed,
-                pforce, cpt_period,max_hours,deviceOptions,imdport,imdfreq,Flags);
-=======
                 nbpu_opt[0],
                 nsteps,nstepout,resetstep,
                 nmultisim,repl_ex_nst,repl_ex_nex,repl_ex_seed,
-                pforce, cpt_period,max_hours,deviceOptions,Flags);
->>>>>>> master
+                pforce, cpt_period,max_hours,deviceOptions,imdport,imdfreq,Flags);
 
   gmx_finalize_par();
 

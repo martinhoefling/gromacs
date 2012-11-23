@@ -190,18 +190,11 @@ static void mdrunner_start_fn(void *arg)
                       mc.bVerbose, mc.bCompact, mc.nstglobalcomm, 
                       mc.ddxyz, mc.dd_node_order, mc.rdd,
                       mc.rconstr, mc.dddlb_opt, mc.dlb_scale, 
-<<<<<<< HEAD
-                      mc.ddcsx, mc.ddcsy, mc.ddcsz, mc.nstepout, mc.resetstep, 
-                      mc.nmultisim, mc.repl_ex_nst, mc.repl_ex_nex, mc.repl_ex_seed, mc.pforce,
-                      mc.cpt_period, mc.max_hours, mc.deviceOptions,
-                      mc.imdport, mc.imdfreq, mc.Flags);
-=======
                       mc.ddcsx, mc.ddcsy, mc.ddcsz,
                       mc.nbpu_opt,
                       mc.nsteps_cmdline, mc.nstepout, mc.resetstep,
                       mc.nmultisim, mc.repl_ex_nst, mc.repl_ex_nex, mc.repl_ex_seed, mc.pforce, 
-                      mc.cpt_period, mc.max_hours, mc.deviceOptions, mc.Flags);
->>>>>>> master
+                      mc.cpt_period, mc.max_hours, mc.deviceOptions, mc.imdport, mc.imdfreq, mc.Flags);
 }
 
 /* called by mdrunner() to start a specific number of threads (including 

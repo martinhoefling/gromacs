@@ -2108,7 +2108,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         if ( (MASTER(cr)) && (mdof_flags & MDOF_IMD) )
         {
             /* Prepare IMD energy record */
-            do_imd_prepare_energies(ir->imd->setup,enerd,step,bNstEner);
+            do_imd_prepare_energies(ir->imd->setup,enerd,step,bCalcEner);
 
             /* Send positions (and energies if properly summed) to client via IMD */
             //imd_send_x_E(top_global,state_global->x, state_global->box,ir);

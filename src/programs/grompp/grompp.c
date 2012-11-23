@@ -80,11 +80,8 @@
 #include "gpp_tomorse.h"
 #include "mtop_util.h"
 #include "genborn.h"
-<<<<<<< HEAD
 #include "imd.h"
-=======
 #include "calc_verletbuf.h"
->>>>>>> master
 
 static int rm_interactions(int ifunc,int nrmols,t_molinfo mols[])
 {
