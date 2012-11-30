@@ -1,33 +1,38 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
- *
- *
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2009, The GROMACS Development Team
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Gromacs is a library for molecular simulation and trajectory analysis,
- * written by Erik Lindahl, David van der Spoel, Berk Hess, and others - for
- * a full list of developers and information, check out http://www.gromacs.org
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
+ * of the License, or (at your option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify it under 
- * the terms of the GNU Lesser General Public License as published by the Free 
- * Software Foundation; either version 2 of the License, or (at your option) any 
- * later version.
- * As a special exception, you may use this file as part of a free software
- * library without restriction.  Specifically, if other files instantiate
- * templates or use macros or inline functions from this file, or you compile
- * this file and link it with other files to produce an executable, this
- * file does not by itself cause the resulting executable to be covered by
- * the GNU Lesser General Public License.  
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * In plain-speak: do not worry about classes/macros/templates either - only
- * changes to the library have to be LGPL, not an application linking with it.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
  *
- * To help fund GROMACS development, we humbly ask that you cite
- * the papers people have written on it - you can find them on the website!
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 /* This is the innermost loop contents for the n vs n atom
@@ -45,13 +50,24 @@
 #define EXCL_FORCES
 #endif
 
-#if !(defined CHECK_EXCLS || defined CALC_ENERGIES) && defined GMX_X86_SSE4_1 && !defined COUNT_PAIRS && !(defined __GNUC__ && (defined CALC_COUL_TAB || (defined CALC_COUL_RF && defined GMX_MM128_HERE)))
 /* Without exclusions and energies we only need to mask the cut-off,
- * this is faster with blendv (only available with SSE4.1 and later).
- * With gcc and PME or RF in 128-bit, blendv is slower;
- * tested with gcc 4.6.2, 4.6.3 and 4.7.1.
+ * this can be faster with blendv (only available with SSE4.1 and later).
  */
+#if !(defined CHECK_EXCLS || defined CALC_ENERGIES) && defined GMX_X86_SSE4_1 && !defined COUNT_PAIRS
+/* With RF and tabulated Coulomb we replace cmp+and with sub+blendv.
+ * With gcc this is slower, except for RF on Sandy Bridge.
+ * Tested with gcc 4.6.2, 4.6.3 and 4.7.1.
+ */
+#if (defined CALC_COUL_RF || defined CALC_COUL_TAB) && (!defined __GNUC__ || (defined CALC_COUL_RF && defined GMX_X86_AVX_256))
 #define CUTOFF_BLENDV
+#endif
+/* With analytical Ewald we replace cmp+and+and with sub+blendv+blendv.
+ * This is only faster with icc on Sandy Bridge (PS kernel slower than gcc 4.7).
+ * Tested with icc 13.
+ */
+#if defined CALC_COUL_EWALD && defined __INTEL_COMPILER && defined GMX_X86_AVX_256
+#define CUTOFF_BLENDV
+#endif
 #endif
 
         {
@@ -118,6 +134,11 @@
             gmx_mm_pr  fsub_SSE2;
             gmx_mm_pr  fsub_SSE3;
 #endif
+#ifdef CALC_COUL_EWALD
+            gmx_mm_pr  brsq_SSE0,brsq_SSE1,brsq_SSE2,brsq_SSE3;
+            gmx_mm_pr  ewcorr_SSE0,ewcorr_SSE1,ewcorr_SSE2,ewcorr_SSE3;
+#endif
+
             /* frcoul = (1/r - fsub)*r */
             gmx_mm_pr  frcoul_SSE0;
             gmx_mm_pr  frcoul_SSE1;
@@ -146,12 +167,14 @@
             gmx_mm_pr  ctabv_SSE1;
             gmx_mm_pr  ctabv_SSE2;
             gmx_mm_pr  ctabv_SSE3;
+#endif
+#endif
+#if defined CALC_ENERGIES && (defined CALC_COUL_EWALD || defined CALC_COUL_TAB)
             /* The potential (PME mesh) we need to subtract from 1/r */
             gmx_mm_pr  vc_sub_SSE0;
             gmx_mm_pr  vc_sub_SSE1;
             gmx_mm_pr  vc_sub_SSE2;
             gmx_mm_pr  vc_sub_SSE3;
-#endif
 #endif
 #ifdef CALC_ENERGIES
             /* Electrostatic potential */
@@ -537,6 +560,40 @@
 #endif
 #endif
 
+#ifdef CALC_COUL_EWALD
+            /* We need to mask (or limit) rsq for the cut-off,
+             * as large distances can cause an overflow in gmx_pmecorrF/V.
+             */
+#ifndef CUTOFF_BLENDV
+            brsq_SSE0     = gmx_mul_pr(beta2_SSE,gmx_and_pr(rsq_SSE0,wco_SSE0));
+            brsq_SSE1     = gmx_mul_pr(beta2_SSE,gmx_and_pr(rsq_SSE1,wco_SSE1));
+            brsq_SSE2     = gmx_mul_pr(beta2_SSE,gmx_and_pr(rsq_SSE2,wco_SSE2));
+            brsq_SSE3     = gmx_mul_pr(beta2_SSE,gmx_and_pr(rsq_SSE3,wco_SSE3));
+#else
+            /* Strangely, putting mul on a separate line is slower (icc 13) */
+            brsq_SSE0     = gmx_mul_pr(beta2_SSE,gmx_blendv_pr(rsq_SSE0,zero_SSE,gmx_sub_pr(rc2_SSE,rsq_SSE0)));
+            brsq_SSE1     = gmx_mul_pr(beta2_SSE,gmx_blendv_pr(rsq_SSE1,zero_SSE,gmx_sub_pr(rc2_SSE,rsq_SSE1)));
+            brsq_SSE2     = gmx_mul_pr(beta2_SSE,gmx_blendv_pr(rsq_SSE2,zero_SSE,gmx_sub_pr(rc2_SSE,rsq_SSE2)));
+            brsq_SSE3     = gmx_mul_pr(beta2_SSE,gmx_blendv_pr(rsq_SSE3,zero_SSE,gmx_sub_pr(rc2_SSE,rsq_SSE3)));
+#endif
+            ewcorr_SSE0   = gmx_mul_pr(gmx_pmecorrF_pr(brsq_SSE0),beta_SSE);
+            ewcorr_SSE1   = gmx_mul_pr(gmx_pmecorrF_pr(brsq_SSE1),beta_SSE);
+            ewcorr_SSE2   = gmx_mul_pr(gmx_pmecorrF_pr(brsq_SSE2),beta_SSE);
+            ewcorr_SSE3   = gmx_mul_pr(gmx_pmecorrF_pr(brsq_SSE3),beta_SSE);
+            frcoul_SSE0   = gmx_mul_pr(qq_SSE0,gmx_add_pr(rinv_ex_SSE0,gmx_mul_pr(ewcorr_SSE0,brsq_SSE0)));
+            frcoul_SSE1   = gmx_mul_pr(qq_SSE1,gmx_add_pr(rinv_ex_SSE1,gmx_mul_pr(ewcorr_SSE1,brsq_SSE1)));
+            frcoul_SSE2   = gmx_mul_pr(qq_SSE2,gmx_add_pr(rinv_ex_SSE2,gmx_mul_pr(ewcorr_SSE2,brsq_SSE2)));
+            frcoul_SSE3   = gmx_mul_pr(qq_SSE3,gmx_add_pr(rinv_ex_SSE3,gmx_mul_pr(ewcorr_SSE3,brsq_SSE3)));
+
+#ifdef CALC_ENERGIES
+            vc_sub_SSE0   = gmx_mul_pr(gmx_pmecorrV_pr(brsq_SSE0),beta_SSE);
+            vc_sub_SSE1   = gmx_mul_pr(gmx_pmecorrV_pr(brsq_SSE1),beta_SSE);
+            vc_sub_SSE2   = gmx_mul_pr(gmx_pmecorrV_pr(brsq_SSE2),beta_SSE);
+            vc_sub_SSE3   = gmx_mul_pr(gmx_pmecorrV_pr(brsq_SSE3),beta_SSE);
+#endif
+
+#endif /* CALC_COUL_EWALD */
+
 #ifdef CALC_COUL_TAB
             /* Electrostatic interactions */
             r_SSE0        = gmx_mul_pr(rsq_SSE0,rinv_SSE0);
@@ -607,7 +664,10 @@
             vc_sub_SSE1   = gmx_add_pr(ctabv_SSE1,gmx_mul_pr(gmx_mul_pr(mhalfsp_SSE,frac_SSE1),gmx_add_pr(ctab0_SSE1,fsub_SSE1)));
             vc_sub_SSE2   = gmx_add_pr(ctabv_SSE2,gmx_mul_pr(gmx_mul_pr(mhalfsp_SSE,frac_SSE2),gmx_add_pr(ctab0_SSE2,fsub_SSE2)));
             vc_sub_SSE3   = gmx_add_pr(ctabv_SSE3,gmx_mul_pr(gmx_mul_pr(mhalfsp_SSE,frac_SSE3),gmx_add_pr(ctab0_SSE3,fsub_SSE3)));
+#endif
+#endif /* CALC_COUL_TAB */
 
+#if defined CALC_ENERGIES && (defined CALC_COUL_EWALD || defined CALC_COUL_TAB)
 #ifndef NO_SHIFT_EWALD
             /* Add Ewald potential shift to vc_sub for convenience */
 #ifdef CHECK_EXCLS
@@ -628,7 +688,6 @@
             vcoul_SSE2    = gmx_mul_pr(qq_SSE2,gmx_sub_pr(rinv_ex_SSE2,vc_sub_SSE2));
             vcoul_SSE3    = gmx_mul_pr(qq_SSE3,gmx_sub_pr(rinv_ex_SSE3,vc_sub_SSE3));
 
-#endif
 #endif
 
 #ifdef CALC_ENERGIES

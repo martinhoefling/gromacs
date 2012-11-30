@@ -1,42 +1,46 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _gmxfio_h
 #define _gmxfio_h
 
 #include <stdio.h>
+#include "visibility.h"
 #include "sysstuff.h"
 #include "typedefs.h"
 #include "xdrf.h"
@@ -97,11 +101,13 @@ int gmx_fio_fp_close(t_fileio *fp);
 
 
 /* Open a file, return a stream, record the entry in internal FIO object */
+GMX_LIBGMX_EXPORT
 FILE* gmx_fio_fopen(const char *fn,const char *mode);
 
 /* Close a file previously opened with gmx_fio_fopen. 
  * Do not mix these calls with standard fopen/fclose ones!
  * Returns 0 on success.  */
+GMX_LIBGMX_EXPORT
 int gmx_fio_fclose(FILE *fp);
 
 
@@ -116,12 +122,14 @@ void gmx_fio_setprecision(t_fileio *fio,gmx_bool bDouble);
 char *gmx_fio_getname(t_fileio *fio);
 /* Return the filename corresponding to the fio index */
 
+GMX_LIBGMX_EXPORT
 int gmx_fio_getftp(t_fileio *fio);
 /* Return the filetype corresponding to the fio index. 
     There is as of now no corresponding setftp function because the file
     was opened as a specific file type and changing that midway is most 
     likely an evil hack. */
 
+GMX_LIBGMX_EXPORT
 void gmx_fio_setdebug(t_fileio *fio,gmx_bool bDebug);
 /* Set the debug mode */
 
@@ -142,6 +150,7 @@ void gmx_fio_checktype(t_fileio *fio);
 void gmx_fio_rewind(t_fileio *fio);
 /* Rewind the tpa file in fio */
 
+GMX_LIBGMX_EXPORT
 int gmx_fio_flush(t_fileio *fio);
 /* Flush the fio, returns 0 on success */
 
@@ -152,15 +161,19 @@ int gmx_fio_fsync(t_fileio *fio);
    can cause dramatically slowed down IO performance. Some OSes (Linux, 
    for example), may implement fsync as a full sync() point. */
 
+GMX_LIBGMX_EXPORT
 gmx_off_t gmx_fio_ftell(t_fileio *fio);
 /* Return file position if possible */
 
+GMX_LIBGMX_EXPORT
 int gmx_fio_seek(t_fileio *fio,gmx_off_t fpos);
 /* Set file position if possible, quit otherwise */
 
+GMX_LIBGMX_EXPORT
 FILE *gmx_fio_getfp(t_fileio *fio);
 /* Return the file pointer itself */
 
+GMX_LIBGMX_EXPORT
 XDR *gmx_fio_getxdr(t_fileio *fio);
 /* Return the file pointer itself */
 
@@ -183,6 +196,7 @@ typedef struct
 gmx_file_position_t;
 
 
+GMX_LIBGMX_EXPORT
 int gmx_fio_check_file_position(t_fileio *fio);
 /* Check if the file position is out of the range of off_t.
  * The result is stored along with the other file data of fio.
@@ -218,6 +232,7 @@ int gmx_fio_get_file_md5(t_fileio *fio, gmx_off_t offset,
 
 int xtc_seek_frame(t_fileio *fio, int frame, int natoms);
 
+GMX_LIBGMX_EXPORT
 int xtc_seek_time(t_fileio *fio, real time, int natoms,gmx_bool bSeekForwardOnly);
 
 	

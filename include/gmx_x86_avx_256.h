@@ -1,22 +1,36 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- * This file is part of GROMACS.
- * Copyright (c) 2012-  
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Written by the Gromacs development team under coordination of
- * David van der Spoel, Berk Hess, and Erik Lindahl.
- *
- * This library is free software; you can redistribute it and/or
+ * GROMACS is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation; either version 2
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
- * 
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifndef _gmx_x86_avx_256_h_
 #define _gmx_x86_avx_256_h_
@@ -35,6 +49,7 @@
 
 #define gmx_mm_extract_epi32(x, imm) _mm_cvtsi128_si32(_mm_srli_si128((x), 4 * (imm)))
 
+#define _GMX_MM_BLEND256D(b3,b2,b1,b0) (((b3) << 3) | ((b2) << 2) | ((b1) << 1) | ((b0)))
 #define _GMX_MM_PERMUTE(fp3,fp2,fp1,fp0) (((fp3) << 6) | ((fp2) << 4) | ((fp1) << 2) | ((fp0)))
 #define _GMX_MM_PERMUTE256D(fp3,fp2,fp1,fp0) (((fp3) << 3) | ((fp2) << 2) | ((fp1) << 1) | ((fp0)))
 #define _GMX_MM_PERMUTE128D(fp1,fp0)         (((fp1) << 1) | ((fp0)))
@@ -46,6 +61,18 @@
     row1           = _mm_unpackhi_pd(__gmx_t1,row1); \
 }
 
+#define GMX_MM256_FULLTRANSPOSE4_PD(row0,row1,row2,row3) \
+{                                                        \
+    __m256d _t0, _t1, _t2, _t3;                          \
+    _t0  = _mm256_unpacklo_pd((row0), (row1));           \
+    _t1  = _mm256_unpackhi_pd((row0), (row1));           \
+    _t2  = _mm256_unpacklo_pd((row2), (row3));           \
+    _t3  = _mm256_unpackhi_pd((row2), (row3));           \
+    row0 = _mm256_permute2f128_pd(_t0, _t2, 0x20);       \
+    row1 = _mm256_permute2f128_pd(_t1, _t3, 0x20);       \
+    row2 = _mm256_permute2f128_pd(_t0, _t2, 0x31);       \
+    row3 = _mm256_permute2f128_pd(_t1, _t3, 0x31);       \
+}
 
 #if (defined (_MSC_VER) || defined(__INTEL_COMPILER))
 #  define gmx_mm_castsi128_ps(a) _mm_castsi128_ps(a)
@@ -81,6 +108,44 @@ static __m128i gmx_mm_castpd_si128(__m128d a)
     return *(__m128i *) &a;
 }
 #endif
+
+static gmx_inline __m256
+gmx_mm256_unpack128lo_ps(__m256 xmm1, __m256 xmm2)
+{
+    return _mm256_permute2f128_ps(xmm1,xmm2,0x20);
+}
+
+static gmx_inline __m256
+gmx_mm256_unpack128hi_ps(__m256 xmm1, __m256 xmm2)
+{
+    return _mm256_permute2f128_ps(xmm1,xmm2,0x31);
+}
+
+static gmx_inline __m256
+gmx_mm256_set_m128(__m128 hi, __m128 lo)
+{
+    return _mm256_insertf128_ps(_mm256_castps128_ps256(lo), hi, 0x1);
+}
+
+
+static __m256d
+gmx_mm256_unpack128lo_pd(__m256d xmm1, __m256d xmm2)
+{
+    return _mm256_permute2f128_pd(xmm1,xmm2,0x20);
+}
+
+static __m256d
+gmx_mm256_unpack128hi_pd(__m256d xmm1, __m256d xmm2)
+{
+    return _mm256_permute2f128_pd(xmm1,xmm2,0x31);
+}
+
+static __m256d
+gmx_mm256_set_m128d(__m128d hi, __m128d lo)
+{
+    return _mm256_insertf128_pd(_mm256_castpd128_pd256(lo), hi, 0x1);
+}
+
 
 
 

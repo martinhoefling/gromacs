@@ -1,30 +1,37 @@
 /*
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
+ * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 2011-2012, The GROMACS Development Team
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Gromacs is a library for molecular simulation and trajectory analysis,
- * written by Erik Lindahl, David van der Spoel, Berk Hess, and others - for
- * a full list of developers and information, check out http://www.gromacs.org
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
+ * of the License, or (at your option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify it under 
- * the terms of the GNU Lesser General Public License as published by the Free 
- * Software Foundation; either version 2 of the License, or (at your option) any 
- * later version.
- * As a special exception, you may use this file as part of a free software
- * library without restriction.  Specifically, if other files instantiate
- * templates or use macros or inline functions from this file, or you compile
- * this file and link it with other files to produce an executable, this
- * file does not by itself cause the resulting executable to be covered by
- * the GNU Lesser General Public License.  
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * In plain-speak: do not worry about classes/macros/templates either - only
- * changes to the library have to be LGPL, not an application linking with it.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
  *
- * To help fund GROMACS development, we humbly ask that you cite
- * the papers people have written on it - you can find them on the website!
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifndef _kernelutil_x86_sse4_1_single_h_
 #define _kernelutil_x86_sse4_1_single_h_
@@ -109,10 +116,10 @@ gmx_mm_load_4pair_swizzle_ps(const float * gmx_restrict p1,
 {
     __m128 t1,t2,t3,t4;
     
-    t1   = _mm_castpd_ps(_mm_load_sd((const double *)p1));
-    t2   = _mm_castpd_ps(_mm_load_sd((const double *)p2));
-    t3   = _mm_castpd_ps(_mm_load_sd((const double *)p3));
-    t4   = _mm_castpd_ps(_mm_load_sd((const double *)p4));
+    t1   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)p1);   /* - - c12a  c6a */
+    t2   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)p2);   /* - - c12b  c6b */
+    t3   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)p3);   /* - - c12c  c6c */
+    t4   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)p4);   /* - - c12d  c6d */
     t1   = _mm_unpacklo_ps(t1,t2);
     t2   = _mm_unpacklo_ps(t3,t4);
     *c6  = _mm_movelh_ps(t1,t2);
@@ -129,8 +136,8 @@ gmx_mm_load_shift_and_1rvec_broadcast_ps(const float * gmx_restrict xyz_shift,
 {
     __m128 t1,t2,t3,t4;
     
-    t1   = _mm_castpd_ps(_mm_load_sd((const double *)xyz_shift));
-    t2   = _mm_castpd_ps(_mm_load_sd((const double *)xyz));
+    t1   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)xyz_shift);
+    t2   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)xyz);
     t3   = _mm_load_ss(xyz_shift+2);
     t4   = _mm_load_ss(xyz+2);
     t1   = _mm_add_ps(t1,t2);
@@ -152,7 +159,7 @@ gmx_mm_load_shift_and_3rvec_broadcast_ps(const float * gmx_restrict xyz_shift,
     __m128 tA,tB;
     __m128 t1,t2,t3,t4,t5,t6;
     
-    tA   = _mm_castpd_ps(_mm_load_sd((const double *)xyz_shift));
+    tA   = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)xyz_shift);
     tB   = _mm_load_ss(xyz_shift+2);
 
     t1   = _mm_loadu_ps(xyz);
@@ -538,41 +545,6 @@ gmx_mm_update_iforce_1atom_swizzle_ps(__m128 fix1, __m128 fiy1, __m128 fiz1,
 	_mm_store_ss(fshiftptr,t3);
 	_mm_storeh_pi((__m64 *)(fshiftptr+1),t3);
 }
-
-static gmx_inline void
-gmx_mm_update_iforce_2atom_swizzle_ps(__m128 fix1, __m128 fiy1, __m128 fiz1,
-                                      __m128 fix2, __m128 fiy2, __m128 fiz2,
-                                      float * gmx_restrict fptr,
-                                      float * gmx_restrict fshiftptr)
-{
-	__m128 t1,t2,t4;
-	
-	fix1 = _mm_hadd_ps(fix1,fiy1);
-	fiz1 = _mm_hadd_ps(fiz1,fix2);
-	fiy2 = _mm_hadd_ps(fiy2,fiz2);
-	
-	fix1 = _mm_hadd_ps(fix1,fiz1); /* fix2 fiz1 fiy1 fix1 */
-	fiy2 = _mm_hadd_ps(fiy2,fiy2); /*  -    -   fiz2 fiy2 */
-    
-	_mm_storeu_ps(fptr,   _mm_add_ps(fix1,_mm_loadu_ps(fptr)  ));
-	t1 = _mm_loadl_pi(_mm_setzero_ps(),(__m64 *)(fptr+4));
-	_mm_storel_pi((__m64 *)(fptr+4), _mm_add_ps(fiy2,t1));
-	
-	t4 = _mm_load_ss(fshiftptr+2);
-	t4 = _mm_loadh_pi(t4,(__m64 *)(fshiftptr));
-	
-	t1 = _mm_shuffle_ps(fix1,fiy2,_MM_SHUFFLE(0,0,3,2));   /* fiy2  -   fix2 fiz1 */
-	t1 = _mm_shuffle_ps(t1,t1,_MM_SHUFFLE(3,1,0,0));       /* fiy2 fix2  -   fiz1 */
-	t2 = _mm_shuffle_ps(fiy2,fix1,_MM_SHUFFLE(1,0,0,1));   /* fiy1 fix1  -   fiz2 */
-    
-	t1 = _mm_add_ps(t1,t2);
-	t1 = _mm_add_ps(t1,t4); /* y x - z */
-	
-	_mm_store_ss(fshiftptr+2,t1);
-	_mm_storeh_pi((__m64 *)(fshiftptr),t1);
-}
-
-
 
 static gmx_inline void
 gmx_mm_update_iforce_3atom_swizzle_ps(__m128 fix1, __m128 fiy1, __m128 fiz1,

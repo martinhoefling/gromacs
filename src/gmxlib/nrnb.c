@@ -1,36 +1,39 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * GROningen Mixture of Alchemy and Childrens' Stories
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -102,14 +105,18 @@ static const t_nrnb_data nbdata[eNRNB] = {
      */
     { "NxN RF Elec. + VdW [F]",         38 }, /* nbnxn kernel LJ+RF, no ener */
     { "NxN RF Elec. + VdW [V&F]",       54 },
-    { "NxN CSTab Elec. + VdW [F]",      41 }, /* nbnxn kernel LJ+tab, no en */
-    { "NxN CSTab Elec. + VdW [V&F]",    59 },
+    { "NxN QSTab Elec. + VdW [F]",      41 }, /* nbnxn kernel LJ+tab, no en */
+    { "NxN QSTab Elec. + VdW [V&F]",    59 },
+    { "NxN Ewald Elec. + VdW [F]",      66 }, /* nbnxn kernel LJ+Ewald, no en */
+    { "NxN Ewald Elec. + VdW [V&F]",   107 },
     { "NxN VdW [F]",                    33 }, /* nbnxn kernel LJ, no ener */
     { "NxN VdW [V&F]",                  43 },
     { "NxN RF Electrostatics [F]",      31 }, /* nbnxn kernel RF, no ener */
     { "NxN RF Electrostatics [V&F]",    36 },
-    { "NxN CSTab Elec. [F]",            34 }, /* nbnxn kernel tab, no ener */
-    { "NxN CSTab Elec. [V&F]",          41 },
+    { "NxN QSTab Elec. [F]",            34 }, /* nbnxn kernel tab, no ener */
+    { "NxN QSTab Elec. [V&F]",          41 },
+    { "NxN Ewald Elec. [F]",            61 }, /* nbnxn kernel Ewald, no ener */
+    { "NxN Ewald Elec. [V&F]",          84 },
     { "1,4 nonbonded interactions",     90 },
     { "Born radii (Still)",             47 },
     { "Born radii (HCT/OBC)",          183 },
@@ -258,8 +265,8 @@ void print_flop(FILE *out,t_nrnb *nrnb,double *nbfs,double *mflop)
 
   if (out)
   {
-      fprintf(out," NB=Group-cutoff nonbonded kernels    NxN=N-by-N tile Verlet kernels\n");
-      fprintf(out," RF=Reaction-Field  VdW=Van der Waals  CSTab=Cubic-spline table\n");
+      fprintf(out," NB=Group-cutoff nonbonded kernels    NxN=N-by-N cluster Verlet kernels\n");
+      fprintf(out," RF=Reaction-Field  VdW=Van der Waals  QSTab=quadratic-spline table\n");
       fprintf(out," W3=SPC/TIP3p  W4=TIP4p (single or pairs)\n");
       fprintf(out," V&F=Potential and force  V=Potential only  F=Force only\n\n");
 

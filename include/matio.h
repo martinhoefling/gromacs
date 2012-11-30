@@ -1,54 +1,60 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _matio_h
 #define _matio_h
-
+#include "visibility.h"
 #include "typedefs.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+GMX_LIBGMX_EXPORT
 gmx_bool matelmt_cmp(t_xpmelmt e1, t_xpmelmt e2);
 
+GMX_LIBGMX_EXPORT
 t_matelmt searchcmap(int n,t_mapping map[],t_xpmelmt c);
 /* Seach in the map for code 'c' and return entry number. 
  * return -1 if not found
  */
 
+GMX_LIBGMX_EXPORT
 int getcmap(FILE *in,const char *fn,t_mapping **map);
 /* Read the mapping table from in, return number of entries */
 
@@ -61,18 +67,22 @@ void printcmap(FILE *out,int n,t_mapping map[]);
 void writecmap(const char *fn,int n,t_mapping map[]);
 /* print mapping table to fn */
 
+GMX_LIBGMX_EXPORT
 int read_xpm_matrix(const char *fnm, t_matrix **matrix);
 /* Reads a number of matrices from .xpm file fnm and returns this number */
 
+GMX_LIBGMX_EXPORT
 real **matrix2real(t_matrix *matrix,real **mat);
 /* Converts an matrix in a t_matrix struct to a matrix of reals
  * When mat==NULL memory will be allocated 
  * Returns NULL when something went wrong
  */
 
+GMX_LIBGMX_EXPORT
 void write_xpm_m(FILE *out, t_matrix m);
 /* Writes a t_matrix struct to .xpm file */ 
 
+GMX_LIBGMX_EXPORT
 void write_xpm3(FILE *out,unsigned int flags,
 		       const char *title,const char *legend,
 		       const char *label_x,const char *label_y,
@@ -82,6 +92,7 @@ void write_xpm3(FILE *out,unsigned int flags,
 /* See write_xpm.
  * Writes a colormap varying as rlo -> rmid -> rhi.
  */
+GMX_LIBGMX_EXPORT
 void write_xpm_split(FILE *out,unsigned int flags,
 			    const char *title,const char *legend,
 			    const char *label_x,const char *label_y,
@@ -98,6 +109,7 @@ void write_xpm_split(FILE *out,unsigned int flags,
  * which is white.
  */
 
+GMX_LIBGMX_EXPORT
 void write_xpm(FILE *out,unsigned int flags,
 		      const char *title,const char *legend,
 		      const char *label_x,const char *label_y,
@@ -126,8 +138,10 @@ void write_xpm(FILE *out,unsigned int flags,
  * nlevels    number of color levels for the output
  */
 
+GMX_LIBGMX_EXPORT
 real **mk_matrix(int nx, int ny, gmx_bool b1D);
 
+GMX_LIBGMX_EXPORT
 void done_matrix(int nx, real ***m);
 
 void clear_matrix(int nx, int ny, real **m);

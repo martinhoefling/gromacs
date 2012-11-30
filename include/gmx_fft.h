@@ -1,19 +1,38 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*- 
- *
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
  * Gromacs 4.0                         Copyright (c) 1991-2003
  * David van der Spoel, Erik Lindahl, University of Groningen.
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
- * 
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _GMX_FFT_H_
@@ -35,7 +54,7 @@
  */
 
 #include <stdio.h>
-
+#include "visibility.h"
 #include "types/simple.h"
 #include "gmxcomplex.h"
 
@@ -158,6 +177,7 @@ gmx_fft_init_many_1d        (gmx_fft_t *       fft,
  *        handles this datatype should only be used for one thread at a time, 
  *        i.e. you should create one copy per thread when executing in parallel.
  */
+GMX_LIBMD_EXPORT
 int
 gmx_fft_init_1d_real        (gmx_fft_t *       fft,
                              int               nx,
@@ -221,6 +241,7 @@ gmx_fft_init_2d        (gmx_fft_t *         fft,
  *        handles this datatype should only be used for one thread at a time, 
  *        i.e. you should create one copy per thread when executing in parallel.
  */
+GMX_LIBMD_EXPORT
 int
 gmx_fft_init_2d_real        (gmx_fft_t *         fft,
                              int                 nx, 
@@ -348,6 +369,7 @@ gmx_fft_many_1d          (gmx_fft_t                  setup,
  * \note Data pointers are declared as void, to avoid casting pointers 
  *       depending on transform direction.
  */
+GMX_LIBMD_EXPORT
 int 
 gmx_fft_1d_real          (gmx_fft_t                  setup,
                           enum gmx_fft_direction     dir,
@@ -437,6 +459,7 @@ gmx_fft_2d               (gmx_fft_t                  setup,
  * \note Data pointers are declared as void, to avoid casting pointers 
  *       depending on transform direction.
  */
+GMX_LIBMD_EXPORT
 int
 gmx_fft_2d_real          (gmx_fft_t                  setup,
                           enum gmx_fft_direction     dir,
@@ -513,6 +536,7 @@ gmx_fft_3d_real          (gmx_fft_t                  setup,
  *		 of the other initializers.
  *
  */
+GMX_LIBMD_EXPORT
 void
 gmx_fft_destroy          (gmx_fft_t                 setup);
 

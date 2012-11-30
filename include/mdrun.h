@@ -1,36 +1,39 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _mdrun_h
@@ -38,6 +41,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include "visibility.h"
 #include "typedefs.h"
 #include "network.h"
 #include "sim_util.h"
@@ -151,47 +155,59 @@ gmx_integrator_t do_md_openmm;
 
 /* ROUTINES from minimize.c */
 
+GMX_LIBMD_EXPORT
 gmx_integrator_t do_steep;
 /* Do steepest descents EM */
 
+GMX_LIBMD_EXPORT
 gmx_integrator_t do_cg;
 /* Do conjugate gradient EM */
 
+GMX_LIBMD_EXPORT
 gmx_integrator_t do_lbfgs;
 /* Do conjugate gradient L-BFGS */
 
+GMX_LIBMD_EXPORT
 gmx_integrator_t do_nm;
 /* Do normal mode analysis */
 
 /* ROUTINES from tpi.c */
 
+GMX_LIBMD_EXPORT
 gmx_integrator_t do_tpi;
 /* Do test particle insertion */
 
 #define MDOF_IMD (1<<5)
 void init_npt_masses(t_inputrec *ir, t_state *state, t_extmass *MassQ, gmx_bool bInit);
 
+GMX_LIBMD_EXPORT
 int ExpandedEnsembleDynamics(FILE *log,t_inputrec *ir, gmx_enerdata_t *enerd,
                              t_state *state, t_extmass *MassQ, df_history_t *dfhist,
                              gmx_large_int_t step, gmx_rng_t mcrng,
                              rvec *v, t_mdatoms *mdatoms);
 
+GMX_LIBMD_EXPORT
 void PrintFreeEnergyInfoToFile(FILE *outfile, t_lambda *fep, t_expanded *expand, t_simtemp *simtemp, df_history_t *dfhist,
                                int nlam, int frequency, gmx_large_int_t step);
 
+GMX_LIBMD_EXPORT
 void get_mc_state(gmx_rng_t rng,t_state *state);
 
+GMX_LIBMD_EXPORT
 void set_mc_state(gmx_rng_t rng,t_state *state);
 
 /* check the version */
+GMX_LIBMD_EXPORT
 void check_ir_old_tpx_versions(t_commrec *cr,FILE *fplog,
                                t_inputrec *ir,gmx_mtop_t *mtop);
 
 /* Allocate and initialize node-local state entries. */
+GMX_LIBMD_EXPORT
 void set_state_entries(t_state *state,const t_inputrec *ir,int nnodes);
 
 /* Broadcast the data for a simulation, and allocate node-specific settings
    such as rng generators. */
+GMX_LIBMD_EXPORT
 void init_parallel(FILE *log, t_commrec *cr, t_inputrec *inputrec,
                           gmx_mtop_t *mtop);
 

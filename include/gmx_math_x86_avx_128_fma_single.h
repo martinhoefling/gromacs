@@ -1,22 +1,36 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- * This file is part of GROMACS.
- * Copyright (c) 2012-  
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Written by the Gromacs development team under coordination of
- * David van der Spoel, Berk Hess, and Erik Lindahl.
- *
- * This library is free software; you can redistribute it and/or
+ * GROMACS is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation; either version 2
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
- * 
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifndef _gmx_math_x86_avx_128_fma_single_h_
 #define _gmx_math_x86_avx_128_fma_single_h_
@@ -51,12 +65,12 @@
 static gmx_inline __m128
 gmx_mm_invsqrt_ps(__m128 x)
 {
-    const __m128 half  = _mm_set_ps(0.5,0.5,0.5,0.5);
-    const __m128 three = _mm_set_ps(3.0,3.0,3.0,3.0);
+    const __m128 half  = _mm_set1_ps(0.5);
+    const __m128 one   = _mm_set1_ps(1.0);
 
     __m128 lu = _mm_rsqrt_ps(x);
 
-    return _mm_mul_ps(_mm_mul_ps(half,lu),_mm_nmacc_ps(_mm_mul_ps(lu,lu),x,three));
+    return _mm_macc_ps(_mm_nmacc_ps(x,_mm_mul_ps(lu,lu),one),_mm_mul_ps(lu,half),lu);
 }
 
 /* sqrt(x) - Do NOT use this (but rather invsqrt) if you actually need 1.0/sqrt(x) */
@@ -78,7 +92,7 @@ gmx_mm_sqrt_ps(__m128 x)
 static gmx_inline __m128
 gmx_mm_inv_ps(__m128 x)
 {
-    const __m128 two = _mm_set_ps(2.0f,2.0f,2.0f,2.0f);
+    const __m128 two = _mm_set1_ps(2.0);
 
     __m128 lu = _mm_rcp_ps(x);
 

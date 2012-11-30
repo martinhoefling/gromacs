@@ -1,41 +1,44 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _readinp_h
 #define _readinp_h
-
+#include "visibility.h"
 #include "typedefs.h"
 #include "warninp.h"
 
@@ -59,6 +62,7 @@ typedef struct {
 
 
 
+GMX_LIBGMX_EXPORT
 t_inpfile *read_inpfile(const char *fn,int *ninp,
 			       char **cppopts,
 			       warninp_t wi);
@@ -67,29 +71,37 @@ t_inpfile *read_inpfile(const char *fn,int *ninp,
    ninp = the number of read parameters
    cppopts = the cpp-style options for #include paths and #defines */
 
+GMX_LIBGMX_EXPORT
 void write_inpfile(const char *fn,int ninp,t_inpfile inp[],
 			  gmx_bool bHaltOnUnknown,
 			  warninp_t wi);
 
+GMX_LIBGMX_EXPORT
 void replace_inp_entry(int ninp,t_inpfile *inp,
 			      const char *old_entry,const char *new_entry);
 
+GMX_LIBGMX_EXPORT
 int get_eint(int *ninp,t_inpfile **inp,const char *name,int def,
 		      warninp_t wi);
 
+GMX_LIBGMX_EXPORT
 gmx_large_int_t get_egmx_large_int(int *ninp,t_inpfile **inp,
 					  const char *name,gmx_large_int_t def,
 					  warninp_t);
   
+GMX_LIBGMX_EXPORT
 double get_ereal(int *ninp,t_inpfile **inp,const char *name,double def,
 			warninp_t wi);
 
+GMX_LIBGMX_EXPORT
 const char *get_estr(int *ninp,t_inpfile **inp,const char *name,const char *def);
 
+GMX_LIBGMX_EXPORT
 int get_eeenum(int *ninp,t_inpfile **inp,const char *name,const char **defs,
 		      warninp_t wi);
 /* defs must be NULL terminated */
 
+GMX_LIBGMX_EXPORT
 int get_eenum(int *ninp,t_inpfile **inp,const char *name,const char **defs);
 /* defs must be NULL terminated */
 
@@ -157,12 +169,15 @@ int opt2parg_int(const char *option,int nparg,t_pargs pa[]);
 
 gmx_bool opt2parg_gmx_bool(const char *option,int nparg,t_pargs pa[]);
 
+GMX_LIBGMX_EXPORT
 real opt2parg_real(const char *option,int nparg,t_pargs pa[]);
 
+GMX_LIBGMX_EXPORT
 const char *opt2parg_str(const char *option,int nparg,t_pargs pa[]);
 
 const char *opt2parg_enum(const char *option,int nparg,t_pargs pa[]);
 
+GMX_LIBGMX_EXPORT
 gmx_bool opt2parg_bSet(const char *option,int nparg,t_pargs pa[]);
 
 void print_pargs(FILE *fp, int npargs,t_pargs pa[],gmx_bool bLeadingSpace);

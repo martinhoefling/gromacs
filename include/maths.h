@@ -1,43 +1,46 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _maths_h
 #define _maths_h
 
 #include <math.h>
+#include "visibility.h"
 #include "types/simple.h"
 #include "typedefs.h"
 
@@ -64,7 +67,22 @@ extern "C" {
 #ifndef M_1_PI
 #define M_1_PI      0.31830988618379067154
 #endif
-    
+
+#ifndef M_FLOAT_1_SQRTPI /* used in CUDA kernels */
+/* 1.0 / sqrt(M_PI) */
+#define M_FLOAT_1_SQRTPI 0.564189583547756f
+#endif
+
+#ifndef M_1_SQRTPI
+/* 1.0 / sqrt(M_PI) */
+#define M_1_SQRTPI 0.564189583547756
+#endif
+
+#ifndef M_2_SQRTPI
+/* 2.0 / sqrt(M_PI) */
+#define M_2_SQRTPI  1.128379167095513
+#endif
+
 /* Suzuki-Yoshida Constants, for n=3 and n=5, for symplectic integration  */
 /* for n=1, w0 = 1 */
 /* for n=3, w0 = w2 = 1/(2-2^-(1/3)), w1 = 1-2*w0 */
@@ -96,13 +114,17 @@ static const double sy_const[MAX_SUZUKI_YOSHIDA_NUM+1][MAX_SUZUKI_YOSHIDA_NUM+1]
     {0.2967324292201065,0.2967324292201065,-0.186929716880426,0.2967324292201065,0.2967324292201065}
 };*/
 
+GMX_LIBGMX_EXPORT
 int		gmx_nint(real a);
 real    sign(real x,real y);
 
 real    cuberoot (real a);
+GMX_LIBGMX_EXPORT
 double  gmx_erfd(double x);
 double  gmx_erfcd(double x);
+GMX_LIBGMX_EXPORT
 float   gmx_erff(float x);
+GMX_LIBGMX_EXPORT
 float   gmx_erfcf(float x);
 #ifdef GMX_DOUBLE
 #define gmx_erf(x)   gmx_erfd(x)
@@ -112,6 +134,7 @@ float   gmx_erfcf(float x);
 #define gmx_erfc(x)  gmx_erfcf(x)
 #endif
 
+GMX_LIBGMX_EXPORT
 gmx_bool gmx_isfinite(real x);
 
 /*! \brief Check if two numbers are within a tolerance
@@ -180,6 +203,7 @@ gmx_log2(real x)
  *
  *  Returns true when overflow did not occur.
  */
+GMX_LIBGMX_EXPORT
 gmx_bool
 check_int_multiply_for_overflow(gmx_large_int_t a,
                                 gmx_large_int_t b,

@@ -1,36 +1,39 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _tpxio_h
@@ -45,6 +48,7 @@
    * can also be used with the routines in gmxfio.h
    *
    **************************************************************/
+#include "visibility.h"
 #include "typedefs.h"
 #include "gmxfio.h"
 
@@ -86,12 +90,15 @@ typedef struct
  * but double and single precision can be read by either.
  */
 
+GMX_LIBGMX_EXPORT
 t_fileio *open_tpx(const char *fn, const char *mode);
 /* Return an file pointer corresponding to the file you have just opened */
   
+GMX_LIBGMX_EXPORT
 void close_tpx(t_fileio *fio);
 /*  Close the file corresponding to fio */
   
+GMX_LIBGMX_EXPORT
 void read_tpxheader(const char *fn, t_tpxheader *tpx, gmx_bool TopOnlyOK,
                            int *version, int *generation);
 /* Read the header from a tpx file and then close it again.
@@ -104,6 +111,7 @@ void read_tpxheader(const char *fn, t_tpxheader *tpx, gmx_bool TopOnlyOK,
  * are returned in the two last arguments.
  */
 
+GMX_LIBGMX_EXPORT
 void write_tpx_state(const char *fn,
 			    t_inputrec *ir,t_state *state,gmx_mtop_t *mtop);
 /* Write a file, and close it again. 
@@ -111,9 +119,11 @@ void write_tpx_state(const char *fn,
  * will not be closed afterwards)
  */
 
+GMX_LIBGMX_EXPORT
 void read_tpx_state(const char *fn,
 			   t_inputrec *ir,t_state *state,rvec *f,
 			   gmx_mtop_t *mtop);
+GMX_LIBGMX_EXPORT
 int read_tpx(const char *fn,
 		    t_inputrec *ir,matrix box,int *natoms,
 		    rvec *x,rvec *v,rvec *f,gmx_mtop_t *mtop);
@@ -124,14 +134,17 @@ int read_tpx(const char *fn,
  * Returns ir->ePBC, if it could be read from the file.
  */
 
+GMX_LIBGMX_EXPORT
 int read_tpx_top(const char *fn,
 			t_inputrec *ir, matrix box,int *natoms,
 			rvec *x,rvec *v,rvec *f,t_topology *top);
 /* As read_tpx, but for the old t_topology struct */
 
+GMX_LIBGMX_EXPORT
 gmx_bool fn2bTPX(const char *file);
 /* return if *file is one of the TPX file types */ 
 
+GMX_LIBGMX_EXPORT
 gmx_bool read_tps_conf(const char *infile,char *title,t_topology *top,
                           int *ePBC, rvec **x,rvec **v,matrix box,gmx_bool bMass);
 /* Read title, top.atoms, x, v (if not NULL) and box from an STX file,

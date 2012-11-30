@@ -1,37 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Green Red Orange Magenta Azure Cyan Skyblue
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -732,7 +734,8 @@ void lambdas_histogram(lambda_t *bl_head, const char *filename,
 
 /* create a collection (array) of barres_t object given a ordered linked list 
    of barlamda_t sample collections */
-static barres_t *barres_list_create(lambda_t *bl_head, int *nres)
+static barres_t *barres_list_create(lambda_t *bl_head, int *nres,
+                                    gmx_bool use_dhdl)
 {
     lambda_t *bl;
     int nlambda=0;
@@ -764,7 +767,7 @@ static barres_t *barres_list_create(lambda_t *bl_head, int *nres)
 
         barres_init(br);
 
-        if (!scprev && !sc)
+        if (use_dhdl)
         {
             /* we use dhdl */
 
@@ -780,16 +783,20 @@ static barres_t *barres_list_create(lambda_t *bl_head, int *nres)
             {
                 gmx_fatal(FARGS,"Some dhdl files contain only one value (dH/dl), while others \ncontain multiple values (dH/dl and/or Delta H), will not proceed \nbecause of possible inconsistencies.\n");
             }
+        } 
+        else if (!scprev && !sc)
+        {
+            gmx_fatal(FARGS,"There is no path from lambda=%g -> %g that is covered by foreign lambdas:\ncannot proceed with BAR.\nUse thermodynamic integration of dH/dl by calculating the averages of dH/dl\nwith g_analyze and integrating them.\nAlternatively, use the -extp option if (and only if) the Hamiltonian\ndepends linearly on lambda, which is NOT normally the case.\n", bl->prev->lambda, bl->lambda);
         }
         
         /* normal delta H */
         if (!scprev)
         {
-            gmx_fatal(FARGS,"Could not find a set for lambda = %g in the files for lambda = %g",bl->lambda,bl->prev->lambda);
+            gmx_fatal(FARGS,"Could not find a set for foreign lambda = %g\nin the files for lambda = %g",bl->lambda,bl->prev->lambda);
         }
         if (!sc)
         {
-            gmx_fatal(FARGS,"Could not find a set for lambda = %g in the files for lambda = %g",bl->prev->lambda,bl->lambda);
+            gmx_fatal(FARGS,"Could not find a set for foreign lambda = %g\nin the files for lambda = %g",bl->prev->lambda,bl->lambda);
         }
         br->a = scprev;
         br->b = sc;
@@ -2472,36 +2479,47 @@ int gmx_bar(int argc,char *argv[])
         "controlled by a parameter, [GRK]lambda[grk] (see the [TT].mdp[tt] parameter",
         "[TT]init_lambda[tt]). The BAR method calculates a ratio of weighted",
         "average of the Hamiltonian difference of state B given state A and",
-        "vice versa. If the Hamiltonian does not depend linearly on [GRK]lambda[grk]",
-        "(in which case we can extrapolate the derivative of the Hamiltonian",
-        "with respect to [GRK]lambda[grk], as is the default when [TT]free_energy[tt] is on),",
-        "the energy differences to the other state need to be calculated",
-        "explicitly during the simulation. This can be controlled with",
+        "vice versa.",
+        "The energy differences to the other state must be calculated",
+        "explicitly during the simulation. This can be done with",
         "the [TT].mdp[tt] option [TT]foreign_lambda[tt].[PAR]",
 
         "Input option [TT]-f[tt] expects multiple [TT]dhdl.xvg[tt] files. ",
         "Two types of input files are supported:[BR]",
-        "[TT]*[tt]  Files with only one [IT]y[it]-value, for such files it is assumed ",
-        "   that the [IT]y[it]-value is dH/d[GRK]lambda[grk] and that the Hamiltonian depends ",
-        "   linearly on [GRK]lambda[grk]. The [GRK]lambda[grk] value of the simulation is inferred ",
-        "   from the subtitle (if present), otherwise from a number in the",
-        "   subdirectory in the file name.",
+        "[TT]*[tt]  Files with more than one [IT]y[it]-value. ",
+        "The files should have columns ",
+        "with dH/d[GRK]lambda[grk] and [GRK]Delta[grk][GRK]lambda[grk]. ",
+        "The [GRK]lambda[grk] values are inferred ",
+        "from the legends: [GRK]lambda[grk] of the simulation from the legend of ",
+        "dH/d[GRK]lambda[grk] and the foreign [GRK]lambda[grk] values from the ",
+        "legends of Delta H",
         "[BR]",
-        "[TT]*[tt]  Files with more than one [IT]y[it]-value. The files should have columns ",
-        "   with dH/d[GRK]lambda[grk] and [GRK]Delta[grk][GRK]lambda[grk]. The [GRK]lambda[grk] values are inferred ",
-        "   from the legends: [GRK]lambda[grk] of the simulation from the legend of dH/d[GRK]lambda[grk] ",
-        "   and the foreign [GRK]lambda[grk] values from the legends of Delta H.[PAR]",
-        "The [GRK]lambda[grk] of the simulation is parsed from [TT]dhdl.xvg[tt] file's legend ",
-        "containing the string 'dH', the foreign [GRK]lambda[grk] values from the legend ",
-        "containing the capitalized letters 'D' and 'H'. The temperature ",
-        "is parsed from the legend line containing 'T ='.[PAR]",
+        "[TT]*[tt]  Files with only one [IT]y[it]-value. Using the",
+        "[TT]-extp[tt] option for these files, it is assumed",
+        "that the [IT]y[it]-value is dH/d[GRK]lambda[grk] and that the ",
+        "Hamiltonian depends linearly on [GRK]lambda[grk]. ",
+        "The [GRK]lambda[grk] value of the simulation is inferred from the ",
+        "subtitle (if present), otherwise from a number in the subdirectory ",
+        "in the file name.[PAR]",
+
+        "The [GRK]lambda[grk] of the simulation is parsed from ",
+        "[TT]dhdl.xvg[tt] file's legend containing the string 'dH', the ",
+        "foreign [GRK]lambda[grk] values from the legend containing the ",
+        "capitalized letters 'D' and 'H'. The temperature is parsed from ",
+        "the legend line containing 'T ='.[PAR]",
 
         "The input option [TT]-g[tt] expects multiple [TT].edr[tt] files. ",
-        "These can contain either lists of energy differences (see the",
-        "[TT].mdp[tt] option [TT]separate_dhdl_file[tt]), or a series of histograms",
-        "(see the [TT].mdp[tt] options [TT]dh_hist_size[tt] and [TT]dh_hist_spacing[tt]).",
-        "The temperature and [GRK]lambda[grk] values are automatically deduced from",
-        "the [TT]ener.edr[tt] file.[PAR]"
+        "These can contain either lists of energy differences (see the ",
+        "[TT].mdp[tt] option [TT]separate_dhdl_file[tt]), or a series of ",
+        "histograms (see the [TT].mdp[tt] options [TT]dh_hist_size[tt] and ",
+        "[TT]dh_hist_spacing[tt]).", "The temperature and [GRK]lambda[grk] ",
+        "values are automatically deduced from the [TT]ener.edr[tt] file.[PAR]",
+
+        "In addition to the [TT].mdp[tt] option [TT]foreign_lambda[tt], ",
+        "the energy difference can also be extrapolated from the ",
+        "dH/d[GRK]lambda[grk] values. This is done with the[TT]-extp[tt]",
+        "option, which assumes that the system's Hamiltonian depends linearly",
+        "on [GRK]lambda[grk], which is not normally the case.[PAR]",
 
         "The free energy estimates are determined using BAR with bisection, ",
         "with the precision of the output set with [TT]-prec[tt]. ",
@@ -2513,12 +2531,13 @@ int gmx_bar(int argc,char *argv[])
         "over 5 blocks. A range of block numbers for error estimation can ",
         "be provided with the options [TT]-nbmin[tt] and [TT]-nbmax[tt].[PAR]",
 
-        "[TT]g_bar[tt] tries to aggregate samples with the same 'native' and 'foreign'",
-        "[GRK]lambda[grk] values, but always assumes independent samples. [BB]Note[bb] that",
-        "when aggregating energy differences/derivatives with different",
-        "sampling intervals, this is almost certainly not correct. Usually",
-        "subsequent energies are correlated and different time intervals mean",
-        "different degrees of correlation between samples.[PAR]",
+        "[TT]g_bar[tt] tries to aggregate samples with the same 'native' and ",
+        "'foreign' [GRK]lambda[grk] values, but always assumes independent ",
+        "samples. [BB]Note[bb] that when aggregating energy ",
+        "differences/derivatives with different sampling intervals, this is ",
+        "almost certainly not correct. Usually subsequent energies are ",
+        "correlated and different time intervals mean different degrees ",
+        "of correlation between samples.[PAR]",
 
         "The results are split in two parts: the last part contains the final ",
         "results in kJ/mol, together with the error estimate for each part ",
@@ -2553,6 +2572,7 @@ int gmx_bar(int argc,char *argv[])
     static real begin=0,end=-1,temp=-1;
     int nd=2,nbmin=5,nbmax=5;
     int nbin=100;
+    gmx_bool use_dhdl=FALSE;
     gmx_bool calc_s,calc_v;
     t_pargs pa[] = {
         { "-b",    FALSE, etREAL, {&begin},  "Begin time for BAR" },
@@ -2561,7 +2581,8 @@ int gmx_bar(int argc,char *argv[])
         { "-prec", FALSE, etINT,  {&nd},     "The number of digits after the decimal point" },
         { "-nbmin",  FALSE, etINT,  {&nbmin}, "Minimum number of blocks for error estimation" },
         { "-nbmax",  FALSE, etINT,  {&nbmax}, "Maximum number of blocks for error estimation" },
-        { "-nbin",  FALSE, etINT, {&nbin}, "Number of bins for histogram output"}
+        { "-nbin",  FALSE, etINT, {&nbin}, "Number of bins for histogram output"},
+        { "-extp",  FALSE, etBOOL, {&use_dhdl}, "Whether to linearly extrapolate dH/dl values to use as energies"}
     };
     
     t_filenm   fnm[] = {
@@ -2662,7 +2683,7 @@ int gmx_bar(int argc,char *argv[])
     }
    
     /* assemble the output structures from the lambdas */
-    results=barres_list_create(lb, &nresults);
+    results=barres_list_create(lb, &nresults, use_dhdl);
 
     sum_disc_err=barres_list_max_disc_err(results, nresults);
 

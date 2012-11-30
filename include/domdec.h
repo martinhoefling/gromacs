@@ -1,24 +1,43 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
  * This file is part of Gromacs        Copyright (c) 1991-2008
  * David van der Spoel, Erik Lindahl, Berk Hess, University of Groningen.
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
- * 
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _domdec_h
 #define _domdec_h
-
+#include "visibility.h"
 #include "typedefs.h"
 #include "types/commrec.h"
 #include "vsite.h"
@@ -73,8 +92,10 @@ int dd_pme_maxshift_x(gmx_domdec_t *dd);
 int dd_pme_maxshift_y(gmx_domdec_t *dd);
 /* Returns the maximum shift for coordinate communication in PME, dim y */
 
+GMX_LIBMD_EXPORT
 void make_dd_communicators(FILE *fplog,t_commrec *cr,int dd_node_order);
 
+GMX_LIBMD_EXPORT
 gmx_domdec_t *
 init_domain_decomposition(FILE *fplog,
                           t_commrec *cr,
@@ -88,6 +109,7 @@ init_domain_decomposition(FILE *fplog,
                           gmx_ddbox_t *ddbox,
                           int *npme_x, int *npme_y);
 
+GMX_LIBMD_EXPORT
 void dd_init_bondeds(FILE *fplog,
                             gmx_domdec_t *dd,gmx_mtop_t *mtop,
                             gmx_vsite_t *vsite,gmx_constr_t constr,
@@ -97,6 +119,7 @@ void dd_init_bondeds(FILE *fplog,
 gmx_bool dd_bonded_molpbc(gmx_domdec_t *dd,int ePBC);
 /* Returns if we need to do pbc for calculating bonded interactions */
 
+GMX_LIBMD_EXPORT
 void set_dd_parameters(FILE *fplog,gmx_domdec_t *dd,real dlb_scale,
                               t_inputrec *ir,t_forcerec *fr,
                               gmx_ddbox_t *ddbox);
@@ -104,6 +127,7 @@ void set_dd_parameters(FILE *fplog,gmx_domdec_t *dd,real dlb_scale,
  * should be called after calling dd_init_bondeds.
  */
 
+GMX_LIBMD_EXPORT
 gmx_bool change_dd_cutoff(t_commrec *cr,t_state *state,t_inputrec *ir,
                           real cutoff_req );
 /* Change the DD non-bonded communication cut-off.
@@ -111,16 +135,19 @@ gmx_bool change_dd_cutoff(t_commrec *cr,t_state *state,t_inputrec *ir,
  * then FALSE will be returned and the cut-off is not modified.
  */
 
+GMX_LIBMD_EXPORT
 void setup_dd_grid(FILE *fplog,gmx_domdec_t *dd);
 
 void dd_collect_vec(gmx_domdec_t *dd,
                            t_state *state_local,rvec *lv,rvec *v);
 
+GMX_LIBMD_EXPORT
 void dd_collect_state(gmx_domdec_t *dd,
                              t_state *state_local,t_state *state);
 
 enum { ddCyclStep, ddCyclPPduringPME, ddCyclF, ddCyclPME, ddCyclNr };
 
+GMX_LIBMD_EXPORT
 void dd_cycles_add(gmx_domdec_t *dd,float cycles,int ddCycl);
 /* Add the wallcycle count to the DD counter */
 
@@ -130,6 +157,7 @@ void dd_force_flop_start(gmx_domdec_t *dd,t_nrnb *nrnb);
 void dd_force_flop_stop(gmx_domdec_t *dd,t_nrnb *nrnb);
 /* Stop the force flop count */
 
+GMX_LIBMD_EXPORT
 float dd_pme_f_ratio(gmx_domdec_t *dd);
 /* Return the PME/PP force load ratio, or -1 if nothing was measured.
  * Should only be called on the DD master node.
@@ -150,6 +178,7 @@ void dd_atom_spread_real(gmx_domdec_t *dd,real v[]);
 void dd_atom_sum_real(gmx_domdec_t *dd,real v[]);
 /* Sum the contributions to a real for each atom over the neighboring cells. */
 
+GMX_LIBMD_EXPORT
 void dd_partition_system(FILE            *fplog,
                                 gmx_large_int_t      step,
                                 t_commrec       *cr,
@@ -176,6 +205,7 @@ void dd_partition_system(FILE            *fplog,
  * When f!=NULL, *f will be reallocated to the size of state_local.
  */
 
+GMX_LIBMD_EXPORT
 void reset_dd_statistics_counters(gmx_domdec_t *dd);
 /* Reset all the statistics and counters for total run counting */
 
@@ -239,8 +269,10 @@ void dd_sort_local_top(gmx_domdec_t *dd,t_mdatoms *mdatoms,
                               gmx_localtop_t *ltop);
 /* Sort ltop->ilist when we are doing free energy. */
 
+GMX_LIBMD_EXPORT
 gmx_localtop_t *dd_init_local_top(gmx_mtop_t *top_global);
 
+GMX_LIBMD_EXPORT
 void dd_init_local_state(gmx_domdec_t *dd,
                                 t_state *state_global,t_state *local_state);
 

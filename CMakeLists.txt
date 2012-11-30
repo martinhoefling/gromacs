@@ -1,3 +1,37 @@
+#
+# This file is part of the GROMACS molecular simulation package.
+#
+# Copyright (c) 2012, by the GROMACS development team, led by
+# David van der Spoel, Berk Hess, Erik Lindahl, and including many
+# others, as listed in the AUTHORS file in the top-level source
+# directory and at http://www.gromacs.org.
+#
+# GROMACS is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public License
+# as published by the Free Software Foundation; either version 2.1
+# of the License, or (at your option) any later version.
+#
+# GROMACS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with GROMACS; if not, see
+# http://www.gnu.org/licenses, or write to the Free Software Foundation,
+# Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+#
+# If you want to redistribute modifications to GROMACS, please
+# consider that scientific software is very special. Version
+# control is crucial - bugs must be traceable. We will be happy to
+# consider code for inclusion in the official distribution, but
+# derived work must not be called official GROMACS. Details are found
+# in the README & COPYING files - if they are missing, get the
+# official version at http://www.gromacs.org.
+#
+# To help us fund GROMACS development, we humbly ask that you cite
+# the research papers on the package. Check out http://www.gromacs.org.
+#
 cmake_minimum_required(VERSION 2.8)
 # Keep CMake suitably quiet on Cygwin
 set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
@@ -23,7 +57,7 @@ mark_as_advanced(DART_ROOT)
 # machine with no git. 
 #
 # NOTE: when releasing the "-dev" suffix needs to be stripped off!
-set(PROJECT_VERSION "4.6-dev")
+set(PROJECT_VERSION "4.6-beta1")
 set(CUSTOM_VERSION_STRING ""
     CACHE STRING "Custom version string (if empty, use hard-coded default)")
 mark_as_advanced(CUSTOM_VERSION_STRING)
@@ -59,8 +93,10 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX)
 set(CMAKE_INSTALL_PREFIX "/usr/local/gromacs" CACHE STRING "Installation prefix (installation will need write permissions here)" FORCE)
 endif()
 
+include(gmxBuildTypeReference)
+
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel Reference." FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 enable_language(C)
@@ -78,7 +114,7 @@ set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_SOURCE_DIR}/admin/InstallWelcome.txt")
 # Its GPL/LGPL, so they do not have to agree to a license for mere usage, but some installers require this...
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/COPYING")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/admin/InstallInfo.txt")
-set(CPACK_SOURCE_IGNORE_FILES ".isreposource;.git;.gitignore")
+set(CPACK_SOURCE_IGNORE_FILES "\\\\.isreposource$;\\\\.git/;\\\\.gitignore$")
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/CPackInit.cmake")
 SET(CPACK_SOURCE_INSTALLED_DIRECTORIES "${CMAKE_SOURCE_DIR};/;${CMAKE_BINARY_DIR}/man;man")
 set(CPACK_PACKAGE_CONTACT "gmx-users@gromacs.org")
@@ -106,10 +142,14 @@ endif()
 ########################################################################
 # User input options - enable C++ - before any CXX flags are changed   #
 ########################################################################
-option(GMX_GPU  "Enable GPU acceleration" ON)
+
+# decide on GPU settings based on user-settings and GPU/CUDA detection
+include(gmxManageGPU)
+
 option(GMX_OPENMM "Accelerated execution on GPUs through the OpenMM library (rerun cmake after changing to see relevant options)" OFF)
 option(GMX_FORCE_CXX "Enable C++ compilation even if not necessary" OFF)
 mark_as_advanced(GMX_FORCE_CXX)
+
 if(GMX_GPU OR GMX_OPENMM OR GMX_FORCE_CXX)
     enable_language(CXX)
 endif()
@@ -120,9 +160,13 @@ set(CMAKE_PREFIX_PATH "" CACHE STRING "Extra locations to search for external li
 ########################################################################
 SET(SHARED_LIBS_DEFAULT ON) 
 IF( WIN32 AND NOT CYGWIN)
-  option(GMX_PREFER_STATIC_LIBS "When finding libraries prefer static system libraries (MT instead of MD)!" ON)
-  mark_as_advanced(GMX_PREFER_STATIC_LIBS)
-  SET(SHARED_LIBS_DEFAULT OFF)  #is currently not working on Windows
+  if (NOT BUILD_SHARED_LIBS)
+    option(GMX_PREFER_STATIC_LIBS "When finding libraries prefer static system libraries (MT instead of MD)!" ON)
+    mark_as_advanced(GMX_PREFER_STATIC_LIBS)
+    SET(SHARED_LIBS_DEFAULT OFF)
+  else()
+    add_definitions(-DUSE_VISIBILITY -DTMPI_USE_VISIBILITY)
+  endif()
 
   IF (GMX_PREFER_STATIC_LIBS)
     #Only setting Debug and Release flags. Others configurations current not used.
@@ -181,6 +225,8 @@ set(GMX_CPU_ACCELERATION "@GMX_SUGGESTED_CPU_ACCELERATION@"
 
 set(GMX_FFT_LIBRARY "fftw3" 
     CACHE STRING "FFT library choices: fftw3,mkl,fftpack[built-in]")
+option(GMX_BUILD_OWN_FFTW "Download and build FFTW 3 during the GROMACS build process, rather than fall back on the really slow fftpack." OFF)
+mark_as_advanced(GMX_BUILD_OWN_FFTW)
 option(GMX_DISABLE_FFTW_MEASURE 
        "Do not optimize FFTW setups (not needed with SSE)" OFF)
 mark_as_advanced(GMX_DISABLE_FFTW_MEASURE)
@@ -255,7 +301,7 @@ endif()
 include(gmxCFlags)
 gmx_c_flags()
 
-include(gmxGetCompilerVersion)
+include(gmxGetCompilerInfo)
 get_compiler_version()
 
 # gcc 4.4.x is buggy and crashes when compiling some files with O3 and OpenMP on.
@@ -263,6 +309,19 @@ get_compiler_version()
 # on the affected files.
 include(gmxGCC44O3BugWorkaround)
 gmx_check_gcc44_bug_workaround_needed(GMX_USE_GCC44_BUG_WORKAROUND)
+
+# clang 3.0 is buggy for some unknown reason detected during adding
+# the SSE2 group kernels for GROMACS 4.6. If we ever work out what
+# that is, we should replace these tests with a compiler feature test,
+# update GROMACS Redmine task #1039 and perhaps report a clang bug.
+#
+# In the meantime, until we require CMake 2.8.10 we cannot rely on it to detect
+# the compiler version for us. So we need a manual check for clang 3.0.
+include(gmxDetectClang30)
+gmx_detect_clang_3_0(COMPILER_IS_CLANG_3_0)
+if(COMPILER_IS_CLANG_3_0)
+    message(FATAL_ERROR "Your compiler is clang version 3.0, which is known to be buggy for GROMACS. Use a different compiler.")
+endif()
 
 ########################################################################
 # Set up binary and library suffixing 
@@ -426,7 +485,6 @@ check_function_exists(fsync             HAVE_FSYNC)
 check_function_exists(_fileno           HAVE__FILENO)
 check_function_exists(fileno            HAVE_FILENO)
 check_function_exists(_commit           HAVE__COMMIT)
-check_function_exists(lstat             HAVE_LSTAT)
 check_function_exists(sigaction         HAVE_SIGACTION)
 check_function_exists(sysconf           HAVE_SYSCONF)
 check_function_exists(sched_setaffinity HAVE_SCHED_SETAFFINITY)
@@ -550,59 +608,10 @@ if(GMX_OPENMM)
     find_package(OpenMM) 
 endif(GMX_OPENMM)
 
-
 if(GMX_GPU)
-    if(GMX_DOUBLE)
-        message(WARNING "GPU acceleration is not available in double precision, disabled!")
-        set(GMX_GPU OFF CACHE BOOL "Enable GPU acceleration" FORCE)
-    endif()
+    # now that we have detected the dependencies, do the second configure pass
+    gmx_gpu_setup()
 endif(GMX_GPU)
-
-if(GMX_GPU)
-
-    # We support CUDA >=v3.2 on *nix, but <= v4.1 doesn't work with MSVC
-    if(MSVC)
-        find_package(CUDA 4.1)
-    else()
-        find_package(CUDA 3.2)
-    endif()
-
-    if (NOT EXISTS ${CUDA_TOOLKIT_ROOT_DIR})
-        message(FATAL_ERROR "
-    mdrun supports native GPU acceleration on NVIDIA hardware with compute
-    capability >=2.0. This requires the NVIDIA CUDA library, which was not
-    found; the location can be hinted by setting CUDA_TOOLKIT_ROOT_DIR.
-
-    CPU or GPU acceleration can be selected at runtime, but if you are
-    sure you can not make use of GPU acceleration, disable it by setting
-    the CMake variable GMX_GPU=OFF.")
-    endif()
-
-    if(NOT GMX_OPENMP)
-        message(WARNING "
-    In order to use GPU acceleration efficiently, mdrun requires OpenMP multithreding.
-    Without OpenMP only a single CPU core per GPU can be used which is suboptimal.
-    Note that with MPI multiple processes can be forced to use a single GPU, but this
-    typically inefficient.")
-    endif()
-
-    include(gmxManageNvccConfig)
-
-    # Check whether we can use atomic operations needed for polling wait for GPU
-    # (to avoid the cudaStreamSynchronize + ECC bug).
-    # With thread-MPI testing atomics has already been carried out, but without
-    # thread-MPI we need to invoke the atomics test independently.
-    if (NOT GMX_THREAD_MPI)
-        set(TEST_TMPI_ATOMICS_ONLY ON CACHE INTERNAL
-            "Test only the atomic operations of thread-MPI.")
-        include(ThreadMPI)
-    endif()
-
-endif()
-# Annoyingly enough, FindCUDA leaves a few variables behind as non-advanced.
-# We need to mark these advanced outside the conditional, otherwise, if the user
-# tuns GMX_GPU=OFF after a failed cmake pass, these variables will be left behind.
-mark_as_advanced(CUDA_BUILD_CUBIN CUDA_BUILD_EMULATION CUDA_SDK_ROOT_DIR CUDA_VERBOSE_BUILD)
 
 if(APPLE)
    find_library(ACCELERATE_FRAMEWORK Accelerate)
@@ -784,7 +793,7 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
         GMX_TEST_CFLAG(MSVC_AVX_CFLAG "/arch:AVX" GROMACS_C_FLAGS)
     endif (NOT GNU_AVX_CFLAG)
     if (NOT GNU_AVX_CFLAG AND NOT MSVC_AVX_CFLAG)
-        message(WARNING "No C AVX flag found. Consider a newer compiler, or disable AVX for much lower performance.")
+        message(WARNING "No C AVX flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
     endif (NOT GNU_AVX_CFLAG AND NOT MSVC_AVX_CFLAG)
 
     if (CMAKE_CXX_COMPILER_LOADED)
@@ -793,7 +802,7 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
             GMX_TEST_CXXFLAG(MSVC_AVX_CXXFLAG "/arch:AVX" GROMACS_CXX_FLAGS)
         endif (NOT GNU_AVX_CXXFLAG)
         if (NOT GNU_AVX_CXXFLAG AND NOT MSVC_AVX_CXXFLAG)
-            message(WARNING "No C++ AVX flag found. Consider a newer compiler, or disable AVX for much lower performance.")
+            message(WARNING "No C++ AVX flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
         endif (NOT GNU_AVX_CXXFLAG AND NOT MSVC_AVX_CXXFLAG)
     endif()
 
@@ -801,13 +810,17 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
     if(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" AND NOT MSVC)
         GMX_TEST_CFLAG(GNU_FMA_CFLAG "-mfma4" GROMACS_C_FLAGS)
         if (NOT GNU_FMA_CFLAG)
-            message(WARNING "No C FMA4 flag found. Consider a newer compiler, or disable AVX_128_FMA for much lower performance.")
+            message(WARNING "No C FMA4 flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
         endif(NOT GNU_FMA_CFLAG)
+        GMX_TEST_CFLAG(GNU_XOP_CFLAG "-mxop" GROMACS_C_FLAGS)
+        # No big deal if we do not have xop, so no point yelling warnings about it.
         if (CMAKE_CXX_COMPILER_LOADED)
             GMX_TEST_CXXFLAG(GNU_FMA_CXXFLAG "-mfma4" GROMACS_CXX_FLAGS)
             if (NOT GNU_FMA_CXXFLAG)
-                message(WARNING "No C++ FMA flag found. Consider a newer compiler, or disable AVX_128_FMA for much lower performance.")
+                message(WARNING "No C++ FMA flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
             endif (NOT GNU_FMA_CXXFLAG)
+            GMX_TEST_CXXFLAG(GNU_XOP_CXXFLAG "-mxop" GROMACS_CXX_FLAGS)
+            # No big deal if we do not have xop, so no point yelling warnings about it.
         endif()
     endif()
 
@@ -948,23 +961,34 @@ set(PKG_FFT_LIBS "")
 if(${GMX_FFT_LIBRARY} STREQUAL "FFTW3")
     if(GMX_DOUBLE)
         set(FFTW fftw)
-    else(GMX_DOUBLE)
+    else()
         set(FFTW fftwf)
-    endif(GMX_DOUBLE)
-    find_package(FFTW COMPONENTS ${FFTW})
+    endif()
+
+    if(GMX_BUILD_OWN_FFTW)
+      add_subdirectory(src/contrib/fftw)
+    else()
+      find_package(FFTW COMPONENTS ${FFTW})
+    endif()
+
     string(TOUPPER "${FFTW}" FFTW)
     set(PKG_FFT "${${FFTW}_PKG}")
     include_directories(${${FFTW}_INCLUDE_DIRS})
     set(FFT_LIBRARIES ${${FFTW}_LIBRARIES})
     if(NOT ${FFTW}_FOUND)
-      MESSAGE(FATAL_ERROR "Cannot find FFTW3 (with correct precision - libfftw3f for single precision GROMACS or libfftw3 for double precision GROMACS). Fix it, choose another FFT library, or use the Gromacs built-in fftpack (slower)!")
-    endif(NOT ${FFTW}_FOUND)
+      MESSAGE(FATAL_ERROR "Cannot find FFTW 3 (with correct precision - libfftw3f for single-precision GROMACS or libfftw3 for double-precision GROMACS). Either choose the right precision, choose another FFT(W) library, enable the advanced option to let GROMACS build FFTW 3 for you, or use the really slow GROMACS built-in fftpack library.")
+    endif()
 
     set(GMX_FFT_FFTW3 1)
 
     if (NOT ${GMX_CPU_ACCELERATION} STREQUAL "NONE" AND NOT ${FFTW}_HAVE_SIMD) 
       message(WARNING "The fftw library found is compiled without SIMD support, which makes it slow. Consider recompiling it or contact your admin")
-    endif (NOT ${GMX_CPU_ACCELERATION} STREQUAL "NONE" AND NOT ${FFTW}_HAVE_SIMD) 
+    endif()
+
+    if(NOT ${GMX_CPU_ACCELERATION} STREQUAL "NONE" AND ${FFTW}_HAVE_AVX)
+        # If we're not doing CPU acceleration, we don't care about FFTW performance on x86 either
+        message(WARNING "The FFTW library was compiled with --enable-avx to enable AVX SIMD instructions. That might sound like a good idea for your processor, but for FFTW versions up to 3.3.3, these are slower than the SSE/SSE2 SIMD instructions for the way GROMACS uses FFTs. Limitations in the way FFTW allows GROMACS to measure performance make it awkward for either GROMACS or FFTW to make the decision for you based on runtime performance. You should compile a different FFTW library with --enable-sse or --enable-sse2. If you have a more recent FFTW, you may like to compare the performance of GROMACS with FFTW libraries compiled with and without --enable-avx. However, the GROMACS developers do not really expect the FFTW AVX optimization to help, because the performance is limited by memory access, not computation.")
+    endif()
 
 elseif(${GMX_FFT_LIBRARY} STREQUAL "MKL")
 #    MESSAGE(STATUS "Using external FFT library - Intel MKL")
@@ -1110,31 +1134,14 @@ if(NOT GMX_OPENMP)
     unset(OpenMP_LINKER_FLAGS CACHE)
     unset(OpenMP_SHARED_LINKER_FLAGS)
 endif()
+
 ######################################
 # Output compiler and CFLAGS used
 ######################################
-execute_process(COMMAND ${CMAKE_C_COMPILER} --version RESULT_VARIABLE TMP_RESULT OUTPUT_VARIABLE CC_VERSION ERROR_VARIABLE CC_VERSION)
-#try executing just the compiler command if that failed...
-if(TMP_RESULT)
-    execute_process(COMMAND ${CMAKE_C_COMPILER} RESULT_VARIABLE TMP_RESULT OUTPUT_VARIABLE CC_VERSION ERROR_VARIABLE CC_VERSION)
-endif()
-string(LENGTH "${CC_VERSION}" len)
-if(len)
-    string(REGEX MATCH "[^\n]+" CC_VERSION "${CC_VERSION}")
-endif()
-
-set(BUILD_COMPILER "@CMAKE_C_COMPILER@ @CMAKE_C_COMPILER_ID@ @CC_VERSION@")
-set(BUILD_CFLAGS "@CMAKE_C_FLAGS@")
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(BUILD_CFLAGS "@BUILD_CFLAGS@ @CMAKE_C_FLAGS_DEBUG@")
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(BUILD_CFLAGS "@BUILD_CFLAGS@ @CMAKE_C_FLAGS_RELEASE@")
-elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
-    set(BUILD_CFLAGS "@BUILD_CFLAGS@ @CMAKE_C_FLAGS_MINSIZEREL@")
-elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    set(BUILD_CFLAGS "@BUILD_CFLAGS@ @CMAKE_C_FLAGS_RELWITHDEBINFO@")
-endif()
-
+get_compiler_info(C BUILD_C_COMPILER BUILD_CFLAGS)
+if (CMAKE_CXX_COMPILER_LOADED)
+    get_compiler_info(CXX BUILD_CXX_COMPILER BUILD_CXXFLAGS)
+endif ()
 
 ########################################################################
 # Specify install locations and which subdirectories to process        #
@@ -1176,6 +1183,15 @@ add_subdirectory(include)
 add_subdirectory(src)
 add_subdirectory(scripts)
 
+# issue GPU acceleration/CUDA-related warning or error if GMX_GPU was set
+# Auto and NVIDIA GPUs were detected.
+if (CUDA_NOTFOUND_AUTO AND NOT GMX_GPU_DETECTION_DONE)
+    message(WARNING "${CUDA_NOTFOUND_MESSAGE}")
+    unset(CUDA_NOTFOUND_AUTO)
+    unset(CUDA_NOTFOUND_MESSAGE)
+endif()
+set(GMX_GPU_DETECTION_DONE TRUE CACHE INTERNAL "Whether GPU detection has already been done")
+
 #######################
 ## uninstall target
 #######################
@@ -1188,7 +1204,6 @@ ADD_CUSTOM_TARGET(uninstall
                   "${CMAKE_COMMAND}" -P 
                   "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 ###########################
-
 
 ########################################################################
 # Tests                                                                #

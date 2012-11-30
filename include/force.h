@@ -1,42 +1,45 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _force_h
 #define _force_h
 
-
+#include "visibility.h"
 #include "typedefs.h"
 #include "types/force_flags.h"
 #include "pbc.h"
@@ -91,6 +94,7 @@ void make_wall_tables(FILE *fplog,const output_env_t oenv,
 real do_walls(t_inputrec *ir,t_forcerec *fr,matrix box,t_mdatoms *md,
 	      rvec x[],rvec f[],real lambda,real Vlj[],t_nrnb *nrnb);
 
+GMX_LIBMD_EXPORT
 t_forcerec *mk_forcerec(void);
 
 #define GMX_MAKETABLES_FORCEUSER  (1<<0)
@@ -120,6 +124,7 @@ extern t_forcetable make_atf_table(FILE *out,const output_env_t oenv,
 				   const char *fn,
 				   matrix box);
 
+GMX_LIBMD_EXPORT
 void pr_forcerec(FILE *fplog,t_forcerec *fr,t_commrec *cr);
 
 void
@@ -129,6 +134,7 @@ forcerec_set_ranges(t_forcerec *fr,
 		    int natoms_force_constr,int natoms_f_novirsum);
 /* Set the number of cg's and atoms for the force calculation */
 
+GMX_LIBMD_EXPORT
 gmx_bool can_use_allvsall(const t_inputrec *ir, const gmx_mtop_t *mtop,
                              gmx_bool bPrintNote,t_commrec *cr,FILE *fp);
 /* Returns if we can use all-vs-all loops.
@@ -136,6 +142,7 @@ gmx_bool can_use_allvsall(const t_inputrec *ir, const gmx_mtop_t *mtop,
  * and fp (if !=NULL) on the master node.
  */
 
+GMX_LIBMD_EXPORT
 gmx_bool uses_simple_tables(int cutoff_scheme,
                             nonbonded_verlet_t *nbv,
                             int group);
@@ -143,6 +150,7 @@ gmx_bool uses_simple_tables(int cutoff_scheme,
  * with the type of kernel indicated.
  */
 
+GMX_LIBMD_EXPORT
 void init_interaction_const_tables(FILE *fp, 
                                    interaction_const_t *ic,
                                    gmx_bool bSimpleTable,
@@ -160,6 +168,7 @@ void init_interaction_const(FILE *fp,
  * uses forcerec as input. 
  */
 
+GMX_LIBMD_EXPORT
 void init_forcerec(FILE       *fplog,     
                           const output_env_t oenv,
 			  t_forcerec *fr,   
@@ -183,15 +192,20 @@ void init_forcerec(FILE       *fplog,
  * print_force >= 0: print forces for atoms with force >= print_force
  */
 
+GMX_LIBMD_EXPORT
 void forcerec_set_excl_load(t_forcerec *fr,
 			    const gmx_localtop_t *top,const t_commrec *cr);
   /* Set the exclusion load for the local exclusions and possibly threads */
 
+GMX_LIBMD_EXPORT
 void init_enerdata(int ngener,int n_lambda,gmx_enerdata_t *enerd);
 /* Intializes the energy storage struct */
 
 void destroy_enerdata(gmx_enerdata_t *enerd);
 /* Free all memory associated with enerd */
+
+void reset_foreign_enerdata(gmx_enerdata_t *enerd);
+/* Resets only the foreign energy data */
 
 void reset_enerdata(t_grpopts *opts,
 			   t_forcerec *fr,gmx_bool bNS,
@@ -199,9 +213,10 @@ void reset_enerdata(t_grpopts *opts,
 			   gmx_bool bMaster);
 /* Resets the energy data, if bNS=TRUE also zeros the long-range part */
 
-void sum_epot(t_grpopts *opts,gmx_enerdata_t *enerd);
+void sum_epot(t_grpopts *opts, gmx_grppairener_t *grpp, real *epot);
 /* Locally sum the non-bonded potential energy terms */
 
+GMX_LIBMD_EXPORT
 void sum_dhdl(gmx_enerdata_t *enerd,real *lambda,t_lambda *fepvals);
 /* Sum the free energy contributions */
 
@@ -212,6 +227,7 @@ void update_forcerec(FILE *fplog,t_forcerec *fr,matrix box);
 void set_avcsixtwelve(FILE *fplog,t_forcerec *fr,
 			     const gmx_mtop_t *mtop);
 
+GMX_LIBMD_EXPORT
 extern void do_force(FILE *log,t_commrec *cr,
 		     t_inputrec *inputrec,
 		     gmx_large_int_t step,t_nrnb *nrnb,gmx_wallcycle_t wcycle,
@@ -239,6 +255,7 @@ extern void do_force(FILE *log,t_commrec *cr,
  * f is always required.
  */
 
+GMX_LIBMD_EXPORT
 void ns(FILE       *fplog,
 	       t_forcerec *fr,
 	       rvec       x[],

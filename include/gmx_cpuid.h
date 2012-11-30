@@ -1,26 +1,40 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- * This file is part of GROMACS.
- * Copyright (c) 2012-  
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Written by the Gromacs development team under coordination of
- * David van der Spoel, Berk Hess, and Erik Lindahl.
- *
- * This library is free software; you can redistribute it and/or
+ * GROMACS is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation; either version 2
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
- * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifndef GMX_CPUID_H_
 #define GMX_CPUID_H_
-
+#include "visibility.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -113,6 +127,7 @@ enum gmx_cpuid_acceleration
 };
 
 /* Text strings corresponding to CPU vendors */
+GMX_LIBGMX_EXPORT
 extern const char *
 gmx_cpuid_vendor_string[GMX_CPUID_NVENDORS];
 
@@ -140,6 +155,7 @@ gmx_cpuid_init              (gmx_cpuid_t *              cpuid);
 /* Return the vendor id as enumerated type. Use gmx_cpuid_vendor_string[]
  * to get the corresponding text string.
  */
+GMX_LIBGMX_EXPORT
 enum gmx_cpuid_vendor
 gmx_cpuid_vendor            (gmx_cpuid_t                cpuid);
 
@@ -150,10 +166,12 @@ gmx_cpuid_brand             (gmx_cpuid_t                cpuid);
 
 
 /* Return processor family version. For a chip of version 1.2.3, this is 1 */
+GMX_LIBGMX_EXPORT
 int
 gmx_cpuid_family            (gmx_cpuid_t                cpuid);
 
 /* Return processor model version, For a chip of version 1.2.3, this is 2. */
+GMX_LIBGMX_EXPORT
 int
 gmx_cpuid_model             (gmx_cpuid_t                cpuid);
 
@@ -166,6 +184,7 @@ gmx_cpuid_stepping          (gmx_cpuid_t                cpuid);
  * Returns 0 if flag "feature" is not set, 1 if the flag is set. We cannot use
  * gmx_bool here since this file must be possible to compile without simple.h.
  */
+GMX_LIBGMX_EXPORT
 int
 gmx_cpuid_feature           (gmx_cpuid_t                cpuid,
                              enum gmx_cpuid_feature     feature);
@@ -210,6 +229,7 @@ enum gmx_cpuid_x86_smt
  * even tested the performance on other SMT implementations, so it is not
  * obvious we shouldn't use SMT there.
  */
+GMX_LIBGMX_EXPORT
 enum gmx_cpuid_x86_smt
 gmx_cpuid_x86_smt(gmx_cpuid_t cpuid);
 

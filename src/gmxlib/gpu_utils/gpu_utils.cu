@@ -1,36 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2010, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gallium Rubidium Oxygen Manganese Argon Carbon Silicon
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #include <stdio.h>
@@ -145,6 +148,8 @@ static const char * const SupportedGPUs[] = {
   * \param[in]  dev_id      the device ID of the GPU or -1 if the device has already been initialized
   * \param[out] dev_prop    pointer to the structure in which the device properties will be returned
   * \returns                0 if the device looks OK
+  *
+  * TODO: introduce errors codes and handle errors more smoothly.
   */
 static int do_sanity_checks(int dev_id, cudaDeviceProp *dev_prop)
 {
@@ -217,7 +222,10 @@ static int do_sanity_checks(int dev_id, cudaDeviceProp *dev_prop)
 
     /* try to execute a dummy kernel */
     k_dummy_test<<<1, 512>>>();
-    CU_LAUNCH_ERR_SYNC("dummy test kernel");
+    if (cudaThreadSynchronize() != cudaSuccess)
+    {
+        return -1;
+    }
 
     /* destroy context if we created one */
     if (id != -1)
@@ -681,13 +689,21 @@ static int is_gmx_supported_gpu_id(int dev_id, cudaDeviceProp *dev_prop)
     int         ndev;
 
     stat = cudaGetDeviceCount(&ndev);
-    CU_RET_ERR(stat, "cudaGetDeviceCount failed");
+    if (stat != cudaSuccess)
+    {
+        return egpuInsane;
+    }
 
     if (dev_id > ndev - 1)
     {
         return egpuNonexistent;
     }
 
+    /* TODO: currently we do not make a distinction between the type of errors
+     * that can appear during sanity checks. This needs to be improved, e.g if
+     * the dummy test kernel fails to execute with a "device busy message" we
+     * should appropriately report that the device is busy instead of insane.
+     */
     if (do_sanity_checks(dev_id, dev_prop) == 0)
     {
         if (is_gmx_supported_gpu(dev_prop))
@@ -714,31 +730,55 @@ static int is_gmx_supported_gpu_id(int dev_id, cudaDeviceProp *dev_prop)
  *  status.
  *
  *  \param[in] gpu_info    pointer to structure holding GPU information.
+ *  \param[out] err_str    The error message of any CUDA API error that caused
+ *                         the detection to fail (if there was any). The memory
+ *                         the pointer points to should be managed externally.
+ *  \returns               non-zero if the detection encountered a failure, zero otherwise.
  */
-void detect_cuda_gpus(gmx_gpu_info_t *gpu_info)
+int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
-    int             i, ndev, checkres;
+    int             i, ndev, checkres, retval;
     cudaError_t     stat;
     cudaDeviceProp  prop;
     cuda_dev_info_t *devs;
 
     assert(gpu_info);
+    assert(err_str);
+
+    ndev    = 0;
+    devs    = NULL;
 
     stat = cudaGetDeviceCount(&ndev);
-    CU_RET_ERR(stat, "cudaGetDeviceCount failed");
-
-    snew(devs, ndev);
-    for (i = 0; i < ndev; i++)
+    if (stat != cudaSuccess)
     {
-        checkres = is_gmx_supported_gpu_id(i, &prop);
+        const char *s;
 
-        devs[i].id   = i;
-        devs[i].prop = prop;
-        devs[i].stat = checkres;
+        /* cudaGetDeviceCount failed which means that there is something
+         * wrong with the machine: driver-runtime mismatch, all GPUs being
+         * busy in exclusive mode, or some other condition which should
+         * result in us issuing a warning a falling back to CPUs. */
+        retval = -1;
+        s = cudaGetErrorString(stat);
+        strncpy(err_str, s, STRLEN*sizeof(err_str[0]));
+    }
+    else
+    {
+        snew(devs, ndev);
+        for (i = 0; i < ndev; i++)
+        {
+            checkres = is_gmx_supported_gpu_id(i, &prop);
+
+            devs[i].id   = i;
+            devs[i].prop = prop;
+            devs[i].stat = checkres;
+        }
+        retval = 0;
     }
 
     gpu_info->ncuda_dev = ndev;
     gpu_info->cuda_dev  = devs;
+
+    return retval;
 }
 
 /*! \brief Select the GPUs compatible with the native GROMACS acceleration.

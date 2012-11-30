@@ -1,33 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- *
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
- *
- *          GROningen MAchine for Chemical Simulations
- *
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
  *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- *
- * For more info, check our website at http://www.gromacs.org
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -4079,7 +4085,7 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
     int  c0,c1,cs,cf,cl;
     int  ndistc;
     int  ncpcheck;
-    int  gridj_flag_shift=0,gridj_flag_offset=0;
+    int  gridj_flag_shift=0,cj_offset=0;
     unsigned *gridj_flag=NULL;
     int  ncj_old_i,ncj_old_j;
 
@@ -4103,12 +4109,14 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
         init_grid_flags(&work->gridi_flags,gridi);
         init_grid_flags(&work->gridj_flags,gridj);
 
+        /* To flag j-blocks for gridj, we need to convert j-clusters to flag blocks */
         gridj_flag_shift = 0;
         while ((nbl->na_cj<<gridj_flag_shift) < NBNXN_CELLBLOCK_SIZE*nbl->na_ci)
         {
             gridj_flag_shift++;
         }
-        gridj_flag_offset = gridj->cell0>>NBNXN_CELLBLOCK_SIZE_2LOG;
+        /* We will subtract the cell offset, which is not a multiple of the block size */
+        cj_offset = ci_to_cj(get_2log(nbl->na_cj),gridj->cell0);
 
         gridj_flag = work->gridj_flags.flag;
     }
@@ -4550,8 +4558,8 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
                                     {
                                         int cbf,cbl,cb;
 
-                                        cbf = (nbl->cj[ncj_old_j].cj >> gridj_flag_shift) - gridj_flag_offset;
-                                        cbl = (nbl->cj[nbl->ncj-1].cj >> gridj_flag_shift) - gridj_flag_offset;
+                                        cbf = (nbl->cj[ncj_old_j].cj - cj_offset) >> gridj_flag_shift;
+                                        cbl = (nbl->cj[nbl->ncj-1].cj - cj_offset) >> gridj_flag_shift;
                                         for(cb=cbf; cb<=cbl; cb++)
                                         {
                                             gridj_flag[cb] = 1U<<th;

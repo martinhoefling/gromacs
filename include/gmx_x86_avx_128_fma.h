@@ -1,22 +1,36 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- * This file is part of GROMACS.
- * Copyright (c) 2012-  
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Written by the Gromacs development team under coordination of
- * David van der Spoel, Berk Hess, and Erik Lindahl.
- *
- * This library is free software; you can redistribute it and/or
+ * GROMACS is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation; either version 2
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the research papers on the package. Check out http://www.gromacs.org
- * 
- * And Hey:
- * Gnomes, ROck Monsters And Chili Sauce
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifndef _gmx_x86_avx_128_fma_h_
 #define _gmx_x86_avx_128_fma_h_
@@ -34,6 +48,7 @@
 
 #define gmx_mm_extract_epi32(x, imm) _mm_cvtsi128_si32(_mm_srli_si128((x), 4 * (imm)))
 
+#define _GMX_MM_BLEND(b3,b2,b1,b0) (((b3) << 3) | ((b2) << 2) | ((b1) << 1) | ((b0)))
 
 #define _GMX_MM_PERMUTE128D(fp1,fp0)         (((fp1) << 1) | ((fp0)))
 
@@ -80,43 +95,44 @@ static __m128i gmx_mm_castpd_si128(__m128d a)
 }
 #endif
 
-#ifndef _MSC_VER
-/* The warning directive is not supported by MSVC, and that compiler
- * does not support overriding built-in functions anyway...
- */
-#if !defined(HAVE_X86INTRIN_H) || !defined(__FMA4__)
-#warning Emulating FMA instructions - this is probably not what you want!
-/* Wrapper routines so we can do test builds on non-FMA hardware */
+#if GMX_EMULATE_AMD_FMA
+/* Wrapper routines so we can do test builds on non-FMA or non-AMD hardware */
 static __m128
 _mm_macc_ps(__m128 a, __m128 b, __m128 c)
 {
-
     return _mm_add_ps(c,_mm_mul_ps(a,b));
 }
 
 static __m128
 _mm_nmacc_ps(__m128 a, __m128 b, __m128 c)
 {
-
     return _mm_sub_ps(c,_mm_mul_ps(a,b));
+}
+
+static __m128
+_mm_msub_ps(__m128 a, __m128 b, __m128 c)
+{
+    return _mm_sub_ps(_mm_mul_ps(a,b),c);
 }
 
 static __m128d
 _mm_macc_pd(__m128d a, __m128d b, __m128d c)
 {
-
     return _mm_add_pd(c,_mm_mul_pd(a,b));
 }
 
 static __m128d
 _mm_nmacc_pd(__m128d a, __m128d b, __m128d c)
 {
-
     return _mm_sub_pd(c,_mm_mul_pd(a,b));
 }
-#endif /* FMA4 support */
 
-#endif /* _MSC_VER */
+static __m128d
+_mm_msub_pd(__m128d a, __m128d b, __m128d c)
+{
+    return _mm_sub_pd(_mm_mul_pd(a,b),c);
+}
+#endif /* AMD FMA emulation support */
 
 static void
 gmx_mm_printxmm_ps(const char *s,__m128 xmm)

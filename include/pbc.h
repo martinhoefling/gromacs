@@ -1,41 +1,44 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _types_pbc_h
 #define _types_pbc_h
-
+#include "visibility.h"
 #include "sysstuff.h"
 #include "typedefs.h"
 #include "types/commrec.h"
@@ -57,9 +60,11 @@ extern "C" {
     ecenterDEF = ecenterTRIC
   };
 
+GMX_LIBGMX_EXPORT
   int ePBC2npbcdim(int ePBC);
   /* Returns the number of dimensions that use pbc, starting at X */
 
+GMX_LIBGMX_EXPORT
   int inputrec2nboundeddim(t_inputrec *ir);
   /* Returns the number of dimensions in which
    * the coordinates of the particles are bounded, starting at X.
@@ -68,30 +73,36 @@ extern "C" {
   void dump_pbc(FILE *fp,t_pbc *pbc);
   /* Dump the contents of the pbc structure to the file */
   
+GMX_LIBGMX_EXPORT
   const char *check_box(int ePBC,matrix box);
   /* Returns NULL if the box is supported by Gromacs.
    * Otherwise is returns a string with the problem.
    * When ePBC=-1, the type of pbc is guessed from the box matrix.
    */
 
+GMX_LIBGMX_EXPORT
   real max_cutoff2(int ePBC,matrix box);
   /* Returns the square of the maximum cut-off allowed for the box,
    * taking into account that the grid neighborsearch code and pbc_dx
    * only check combinations of single box-vector shifts.
    */
 
+GMX_LIBGMX_EXPORT
   int guess_ePBC(matrix box);
   /* Guesses the type of periodic boundary conditions using the box */
 
+GMX_LIBGMX_EXPORT
   gmx_bool correct_box(FILE *fplog,int step,tensor box,t_graph *graph);
   /* Checks for un-allowed box angles and corrects the box
    * and the integer shift vectors in the graph (if graph!=NULL) if necessary.
    * Returns TRUE when the box was corrected.
    */
 
+GMX_LIBGMX_EXPORT
   int ndof_com(t_inputrec *ir);
   /* Returns the number of degrees of freedom of the center of mass */
 
+GMX_LIBGMX_EXPORT
   void set_pbc(t_pbc *pbc,int ePBC,matrix box);
   /* Initiate the periodic boundary conditions.
    * pbc_dx will not use pbc and return the normal difference vector
@@ -99,6 +110,7 @@ extern "C" {
    * When ePBC=-1, the type of pbc is guessed from the box matrix.
    */
 
+GMX_LIBGMX_EXPORT
   t_pbc *set_pbc_dd(t_pbc *pbc,int ePBC,
 			   gmx_domdec_t *dd,gmx_bool bSingleDir,matrix box);
   /* As set_pbc, but additionally sets that correct distances can
@@ -110,6 +122,7 @@ extern "C" {
    * Returns pbc when pbc operations are required, NULL otherwise.
    */
 
+GMX_LIBGMX_EXPORT
   void pbc_dx(const t_pbc *pbc,const rvec x1, const rvec x2, rvec dx);
   /* Calculate the correct distance vector from x2 to x1 and put it in dx.
    * set_pbc must be called before ever calling this routine.
@@ -123,6 +136,7 @@ extern "C" {
    * pbc->bLimitDistance=FALSE and thus all distances are correct.
    */
 
+GMX_LIBGMX_EXPORT
   int pbc_dx_aiuc(const t_pbc *pbc,const rvec x1,const rvec x2,rvec dx);
   /* Calculate the correct distance vector from x2 to x1 and put it in dx,
    * This function can only be used when all atoms are in the rectangular
@@ -132,6 +146,7 @@ extern "C" {
    * (see calc_shifts below on how to obtain shift_vec)
    * set_pbc_dd or set_pbc must be called before ever calling this routine.
    */
+GMX_LIBGMX_EXPORT
   void pbc_dx_d(const t_pbc *pbc,const dvec x1, const dvec x2, dvec dx);
   /* As pbc_dx, but for double precision vectors.
    * set_pbc must be called before ever calling this routine.
@@ -166,23 +181,28 @@ extern "C" {
    * It is assumed that rlong2 is scaled the same way as the ivecs xi and xj.
    */
 
+GMX_LIBGMX_EXPORT
   void calc_shifts(matrix box,rvec shift_vec[]);
   /* This routine calculates ths shift vectors necessary to use the
    * ns routine.
    */
 
+GMX_LIBGMX_EXPORT
   void calc_box_center(int ecenter,matrix box,rvec box_center);
   /* Calculates the center of the box.
    * See the description for the enum ecenter above.
    */
 
+GMX_LIBGMX_EXPORT
   void calc_triclinic_images(matrix box,rvec img[]);
   /* Calculates the NTRICIMG box images */
 
+GMX_LIBGMX_EXPORT
   void calc_compact_unitcell_vertices(int ecenter,matrix box,
 					     rvec vert[]);
   /* Calculates the NCUCVERT vertices of a compact unitcell */
   
+GMX_LIBGMX_EXPORT
   int *compact_unitcell_edges(void);
   /* Return an array of unitcell edges of length NCUCEDGE*2,
    * this is an index in vert[], which is calculated by calc_unitcell_vertices.
@@ -190,6 +210,7 @@ extern "C" {
    * The index does not change, so it needs to be retrieved only once.
    */
 
+GMX_LIBGMX_EXPORT
   void put_atoms_in_box_omp(int ePBC,matrix box,int natoms,rvec x[]);
   /* This wrapper function around put_atoms_in_box() with the ugly manual
    * workload splitting is needed toavoid silently introducing multithreading
@@ -197,18 +218,21 @@ extern "C" {
    * */
 
 
+GMX_LIBGMX_EXPORT
   void put_atoms_in_box(int ePBC, matrix box,int natoms,rvec x[]);
   /* These routines puts ONE or ALL atoms in the box, not caring 
    * about charge groups!
    * Also works for triclinic cells.
    */
   
+GMX_LIBGMX_EXPORT
   void put_atoms_in_triclinic_unitcell(int ecenter,matrix box,
 					      int natoms,rvec x[]);
   /* This puts ALL atoms in the triclinic unit cell, centered around the
    * box center as calculated by calc_box_center.
    */
 
+GMX_LIBGMX_EXPORT
   const char *put_atoms_in_compact_unitcell(int ePBC,int ecenter,
                                                    matrix box,
 					           int natoms,rvec x[]);

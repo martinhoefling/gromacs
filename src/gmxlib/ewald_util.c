@@ -1,36 +1,39 @@
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * GROningen Mixture of Alchemy and Childrens' Stories
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -103,14 +106,12 @@ real ewald_LRcorrection(FILE *fplog,
   real    eps,eps2,VV,FF,F,Y,Geps,Heps2,Fp,fijC,r1t;
   real    *VFtab=fr->coulvdwtab;
   int     n0,n1,nnn;
-#else
-  double  isp=0.564189583547756;
 #endif
   gmx_bool    bFreeEnergy = (chargeB != NULL);
   gmx_bool    bMolPBC = fr->bMolPBC;
 
   one_4pi_eps = ONE_4PI_EPS0/fr->epsilon_r;
-  vr0 = ewc*2/sqrt(M_PI);
+  vr0 = ewc*M_2_SQRTPI;
 
   AA         = excl->a;
   Vexcl      = 0;
@@ -237,7 +238,7 @@ real ewald_LRcorrection(FILE *fplog,
 #define	      R_ERF_R_INACC 0.1
 #endif
 	      if (ewcdr > R_ERF_R_INACC) {
-		fscal = rinv2*(vc - 2.0*qqA*ewc*isp*exp(-ewcdr*ewcdr));
+		fscal = rinv2*(vc - qqA*ewc*M_2_SQRTPI*exp(-ewcdr*ewcdr));
 	      } else {
 		/* Use a fourth order series expansion for small ewcdr */
 		fscal = ewc*ewc*qqA*vr0*(2.0/3.0 - 0.4*ewcdr*ewcdr);
@@ -302,7 +303,7 @@ real ewald_LRcorrection(FILE *fplog,
 	      v      = gmx_erf(ewc*dr)*rinv;
 	      vc     = qqL*v;
 	      Vexcl += vc;
-	      fscal  = rinv2*(vc-2.0*qqL*ewc*isp*exp(-ewc*ewc*dr2));
+	      fscal  = rinv2*(vc-qqL*ewc*M_2_SQRTPI*exp(-ewc*ewc*dr2));
 	      svmul(fscal,dx,df);
 	      rvec_inc(f[k],df);
 	      rvec_dec(f[i],df);
@@ -338,7 +339,7 @@ real ewald_LRcorrection(FILE *fplog,
     for(q=0; q<(bFreeEnergy ? 2 : 1); q++) {
       if (calc_excl_corr) {
         /* Self-energy correction */
-        Vself[q] = ewc*one_4pi_eps*fr->q2sum[q]/sqrt(M_PI);
+        Vself[q] = ewc*one_4pi_eps*fr->q2sum[q]*M_1_SQRTPI;
       }
       
       /* Apply surface dipole correction:

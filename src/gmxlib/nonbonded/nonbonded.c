@@ -1,37 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * GROningen Mixture of Alchemy and Childrens' Stories
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -72,16 +74,29 @@
 /* Different default (c) and accelerated interaction-specific kernels */
 #include "nb_kernel_c/nb_kernel_c.h"
 
-/* Temporary enabler until we add the AVX kernels */
-#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA) || (defined GMX_CPU_ACCELERATION_X86_AVX_256)
-#    define GMX_CPU_ACCELERATION_X86_SSE4_1
-#endif
-
 #if (defined GMX_CPU_ACCELERATION_X86_SSE2) && !(defined GMX_DOUBLE)
 #    include "nb_kernel_sse2_single/nb_kernel_sse2_single.h"
 #endif
 #if (defined GMX_CPU_ACCELERATION_X86_SSE4_1) && !(defined GMX_DOUBLE)
 #    include "nb_kernel_sse4_1_single/nb_kernel_sse4_1_single.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA) && !(defined GMX_DOUBLE)
+#    include "nb_kernel_avx_128_fma_single/nb_kernel_avx_128_fma_single.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256) && !(defined GMX_DOUBLE)
+#    include "nb_kernel_avx_256_single/nb_kernel_avx_256_single.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_SSE2 && defined GMX_DOUBLE)
+#    include "nb_kernel_sse2_double/nb_kernel_sse2_double.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_SSE4_1 && defined GMX_DOUBLE)
+#    include "nb_kernel_sse4_1_double/nb_kernel_sse4_1_double.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA && defined GMX_DOUBLE)
+#    include "nb_kernel_avx_128_fma_double/nb_kernel_avx_128_fma_double.h"
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256 && defined GMX_DOUBLE)
+#    include "nb_kernel_avx_256_double/nb_kernel_avx_256_double.h"
 #endif
 
 
@@ -110,11 +125,31 @@ gmx_nonbonded_setup(FILE *         fplog,
             if(!(fr!=NULL && fr->use_cpu_acceleration==FALSE))
             {
                 /* Add interaction-specific kernels for different architectures */
+                /* Single precision */
 #if (defined GMX_CPU_ACCELERATION_X86_SSE2) && !(defined GMX_DOUBLE)
                 nb_kernel_list_add_kernels(kernellist_sse2_single,kernellist_sse2_single_size);
 #endif
 #if (defined GMX_CPU_ACCELERATION_X86_SSE4_1) && !(defined GMX_DOUBLE)
                 nb_kernel_list_add_kernels(kernellist_sse4_1_single,kernellist_sse4_1_single_size);
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA) && !(defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_avx_128_fma_single,kernellist_avx_128_fma_single_size);
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256) && !(defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_avx_256_single,kernellist_avx_256_single_size);
+#endif
+                /* Double precision */
+#if (defined GMX_CPU_ACCELERATION_X86_SSE2 && defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_sse2_double,kernellist_sse2_double_size);
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_SSE4_1 && defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_sse4_1_double,kernellist_sse4_1_double_size);
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA && defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_avx_128_fma_double,kernellist_avx_128_fma_double_size);
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256 && defined GMX_DOUBLE)
+                nb_kernel_list_add_kernels(kernellist_avx_256_double,kernellist_avx_256_double_size);
 #endif
                 ; /* empty statement to avoid a completely empty block */
             }
@@ -149,11 +184,37 @@ gmx_nonbonded_set_kernel_pointers(FILE *log, t_nblist *nl)
     }
     arch_and_padding[] =
     {
+        /* Single precision */
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256) && !(defined GMX_DOUBLE)
+        { "avx_256_single", 8 },
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA) && !(defined GMX_DOUBLE)
+        { "avx_128_fma_single", 4 },
+#endif
 #if (defined GMX_CPU_ACCELERATION_X86_SSE4_1) && !(defined GMX_DOUBLE)
         { "sse4_1_single", 4 },
 #endif
 #if (defined GMX_CPU_ACCELERATION_X86_SSE2) && !(defined GMX_DOUBLE)
         { "sse2_single", 4 },
+#endif
+        /* Double precision */
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_256 && defined GMX_DOUBLE)
+        { "avx_256_double", 4 },
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_AVX_128_FMA && defined GMX_DOUBLE)
+        /* Sic. Double precision 2-way SIMD does not require neighbor list padding,
+         * since the kernels execute a loop unrolled a factor 2, followed by
+         * a possible single odd-element epilogue.
+         */
+        { "avx_128_fma_double", 1 },
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_SSE2 && defined GMX_DOUBLE)
+        /* No padding - see comment above */
+        { "sse2_double", 1 },
+#endif
+#if (defined GMX_CPU_ACCELERATION_X86_SSE4_1 && defined GMX_DOUBLE)
+        /* No padding - see comment above */
+        { "sse4_1_double", 1 },
 #endif
         { "c", 1 },
     };
@@ -221,9 +282,9 @@ gmx_nonbonded_set_kernel_pointers(FILE *log, t_nblist *nl)
             nl->kernelptr_vf = gmx_nb_generic_kernel;
             nl->kernelptr_f  = gmx_nb_generic_kernel;
             nl->simd_padding_width = 1;
-            if(log)
+            if(debug)
             {
-                fprintf(log,
+                fprintf(debug,
                         "WARNING - Slow generic NB kernel used for neighborlist with\n"
                         "    Elec: '%s', Modifier: '%s'\n"
                         "    Vdw:  '%s', Modifier: '%s'\n"

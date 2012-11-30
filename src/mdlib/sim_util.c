@@ -1,37 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- *
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
- *
- *          GROningen MAchine for Chemical Simulations
- *
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
  *
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
  *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- *
- * For more info, check our website at http://www.gromacs.org
- *
- * And Hey:
- * GROwing Monsters And Cloning Shrimps
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -48,6 +50,7 @@
 #include <sys/time.h>
 #endif
 #include <math.h>
+#include "visibility.h"
 #include "typedefs.h"
 #include "string2.h"
 #include "gmxfio.h"
@@ -118,6 +121,7 @@ typedef struct gmx_timeprint {
 #endif
 
 /* Portable version of ctime_r implemented in src/gmxlib/string2.c, but we do not want it declared in public installed headers */
+GMX_LIBGMX_EXPORT
 char *
 gmx_ctime_r(const time_t *clock,char *buf, int n);
 
@@ -602,7 +606,7 @@ static void do_nb_verlet(t_forcerec *fr,
                          t_nrnb *nrnb,
                          gmx_wallcycle_t wcycle)
 {
-    int     nnbl, kernel_type, sh_e;
+    int     nnbl, kernel_type, enr_nbnxn_kernel_ljc, enr_nbnxn_kernel_lj;
     char    *env;
     nonbonded_verlet_group_t  *nbvg;
 
@@ -642,6 +646,7 @@ static void do_nb_verlet(t_forcerec *fr,
         case nbk4xN_X86_SIMD128:
             nbnxn_kernel_x86_simd128(&nbvg->nbl_lists,
                                      nbvg->nbat, ic,
+                                     nbvg->ewald_excl,
                                      fr->shift_vec,
                                      flags,
                                      clearF,
@@ -654,6 +659,7 @@ static void do_nb_verlet(t_forcerec *fr,
         case nbk4xN_X86_SIMD256:
             nbnxn_kernel_x86_simd256(&nbvg->nbl_lists,
                                      nbvg->nbat, ic,
+                                     nbvg->ewald_excl,
                                      fr->shift_vec,
                                      flags,
                                      clearF,
@@ -691,16 +697,31 @@ static void do_nb_verlet(t_forcerec *fr,
         wallcycle_sub_stop(wcycle, ewcsNONBONDED);
     }
 
-    /* In eNR_??? the nbnxn F+E kernels are always the F kernel + 1 */
-    sh_e = ((flags & GMX_FORCE_ENERGY) ? 1 : 0);
-    inc_nrnb(nrnb,
-             ((EEL_RF(ic->eeltype) || ic->eeltype == eelCUT) ?
-              eNR_NBNXN_LJ_RF : eNR_NBNXN_LJ_TAB) + sh_e,
+    if (EEL_RF(ic->eeltype) || ic->eeltype == eelCUT)
+    {
+        enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_RF;
+    }
+    else if (nbvg->ewald_excl == ewaldexclTable)
+    {
+        enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_TAB;
+    }
+    else
+    {
+        enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_EWALD;
+    }
+    enr_nbnxn_kernel_lj = eNR_NBNXN_LJ;
+    if (flags & GMX_FORCE_ENERGY)
+    {
+        /* In eNR_??? the nbnxn F+E kernels are always the F kernel + 1 */
+        enr_nbnxn_kernel_ljc += 1;
+        enr_nbnxn_kernel_lj  += 1;
+    }
+
+    inc_nrnb(nrnb,enr_nbnxn_kernel_ljc,
              nbvg->nbl_lists.natpair_ljq);
-    inc_nrnb(nrnb,eNR_NBNXN_LJ+sh_e,nbvg->nbl_lists.natpair_lj);
-    inc_nrnb(nrnb,
-             ((EEL_RF(ic->eeltype) || ic->eeltype == eelCUT) ?
-              eNR_NBNXN_RF : eNR_NBNXN_TAB)+sh_e,
+    inc_nrnb(nrnb,enr_nbnxn_kernel_lj,
+             nbvg->nbl_lists.natpair_lj);
+    inc_nrnb(nrnb,enr_nbnxn_kernel_ljc-eNR_NBNXN_LJ_RF+eNR_NBNXN_RF,
              nbvg->nbl_lists.natpair_q);
 }
 
@@ -1398,7 +1419,7 @@ void do_force_cutsVERLET(FILE *fplog,t_commrec *cr,
     }
     
     /* Sum the potential energy terms from group contributions */
-    sum_epot(&(inputrec->opts),enerd);
+    sum_epot(&(inputrec->opts),&(enerd->grpp),enerd->term);
 }
 
 void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
@@ -1896,7 +1917,7 @@ void do_force_cutsGROUP(FILE *fplog,t_commrec *cr,
     }
 
     /* Sum the potential energy terms from group contributions */
-    sum_epot(&(inputrec->opts),enerd);
+    sum_epot(&(inputrec->opts),&(enerd->grpp),enerd->term);
 }
 
 void do_force(FILE *fplog,t_commrec *cr,

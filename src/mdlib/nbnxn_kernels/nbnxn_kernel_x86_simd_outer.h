@@ -1,33 +1,38 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
- *
- *
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2009, The GROMACS Development Team
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Gromacs is a library for molecular simulation and trajectory analysis,
- * written by Erik Lindahl, David van der Spoel, Berk Hess, and others - for
- * a full list of developers and information, check out http://www.gromacs.org
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
+ * of the License, or (at your option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) any
- * later version.
- * As a special exception, you may use this file as part of a free software
- * library without restriction.  Specifically, if other files instantiate
- * templates or use macros or inline functions from this file, or you compile
- * this file and link it with other files to produce an executable, this
- * file does not by itself cause the resulting executable to be covered by
- * the GNU Lesser General Public License.
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * In plain-speak: do not worry about classes/macros/templates either - only
- * changes to the library have to be LGPL, not an application linking with it.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
  *
- * To help fund GROMACS development, we humbly ask that you cite
- * the papers people have written on it - you can find them on the website!
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 /* GMX_MM128_HERE or GMX_MM256_HERE should be set before including this file */
@@ -106,6 +111,13 @@
 #define NBK_FUNC_NAME(b,s,e) NBK_FUNC_NAME_C(b,s,tab,e)
 #else
 #define NBK_FUNC_NAME(b,s,e) NBK_FUNC_NAME_C(b,s,tab_twin,e)
+#endif
+#endif
+#ifdef CALC_COUL_EWALD
+#ifndef VDW_CUTOFF_CHECK
+#define NBK_FUNC_NAME(b,s,e) NBK_FUNC_NAME_C(b,s,ewald,e)
+#else
+#define NBK_FUNC_NAME(b,s,e) NBK_FUNC_NAME_C(b,s,ewald_twin,e)
 #endif
 #endif
 
@@ -270,6 +282,7 @@ NBK_FUNC_NAME_S128_OR_S256(nbnxn_kernel,energrp)
 #ifdef CALC_ENERGIES
     gmx_mm_pr  hrc_3_SSE,moh_rc_SSE;
 #endif
+
 #ifdef CALC_COUL_TAB
     /* Coulomb table variables */
     gmx_mm_pr  invtsp_SSE;
@@ -285,8 +298,15 @@ NBK_FUNC_NAME_S128_OR_S256(nbnxn_kernel,energrp)
 #endif
 #ifdef CALC_ENERGIES
     gmx_mm_pr  mhalfsp_SSE;
-    gmx_mm_pr  sh_ewald_SSE;
 #endif
+#endif
+
+#ifdef CALC_COUL_EWALD
+    gmx_mm_pr beta2_SSE,beta_SSE;
+#endif
+
+#if defined CALC_ENERGIES && (defined CALC_COUL_EWALD || defined CALC_COUL_TAB)
+    gmx_mm_pr  sh_ewald_SSE;
 #endif
 
 #ifdef LJ_COMB_LB
@@ -368,8 +388,6 @@ NBK_FUNC_NAME_S128_OR_S256(nbnxn_kernel,energrp)
     invtsp_SSE  = gmx_set1_pr(ic->tabq_scale);
 #ifdef CALC_ENERGIES
     mhalfsp_SSE = gmx_set1_pr(-0.5/ic->tabq_scale);
-
-    sh_ewald_SSE = gmx_set1_pr(ic->sh_ewald);
 #endif
 
 #ifdef TAB_FDV0
@@ -378,6 +396,15 @@ NBK_FUNC_NAME_S128_OR_S256(nbnxn_kernel,energrp)
     tab_coul_F = ic->tabq_coul_F;
     tab_coul_V = ic->tabq_coul_V;
 #endif
+#endif /* CALC_COUL_TAB */
+
+#ifdef CALC_COUL_EWALD
+    beta2_SSE = gmx_set1_pr(ic->ewaldcoeff*ic->ewaldcoeff);
+    beta_SSE  = gmx_set1_pr(ic->ewaldcoeff);
+#endif
+
+#if (defined CALC_COUL_TAB || defined CALC_COUL_EWALD) && defined CALC_ENERGIES
+    sh_ewald_SSE = gmx_set1_pr(ic->sh_ewald);
 #endif
 
     q                   = nbat->q;
@@ -523,6 +550,10 @@ NBK_FUNC_NAME_S128_OR_S256(nbnxn_kernel,energrp)
 #else
             Vc_sub_self = 0.5*tab_coul_V[0];
 #endif
+#endif
+#ifdef CALC_COUL_EWALD
+            /* beta/sqrt(pi) */
+            Vc_sub_self = 0.5*ic->ewaldcoeff*M_2_SQRTPI;
 #endif
 
             for(ia=0; ia<UNROLLI; ia++)

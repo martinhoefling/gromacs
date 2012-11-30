@@ -1,31 +1,38 @@
 /*
- *                This source code is part of
- *
- *                 G   R   O   M   A   C   S
+ * This file is part of the GROMACS molecular simulation package.
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS Development Team
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * Gromacs is a library for molecular simulation and trajectory analysis,
- * written by Erik Lindahl, David van der Spoel, Berk Hess, and others - for
- * a full list of developers and information, check out http://www.gromacs.org
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
+ * of the License, or (at your option) any later version.
  *
- * This program is free software; you can redistribute it and/or modify it under 
- * the terms of the GNU Lesser General Public License as published by the Free 
- * Software Foundation; either version 2 of the License, or (at your option) any 
- * later version.
- * As a special exception, you may use this file as part of a free software
- * library without restriction.  Specifically, if other files instantiate
- * templates or use macros or inline functions from this file, or you compile
- * this file and link it with other files to produce an executable, this
- * file does not by itself cause the resulting executable to be covered by
- * the GNU Lesser General Public License.  
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * In plain-speak: do not worry about classes/macros/templates either - only
- * changes to the library have to be LGPL, not an application linking with it.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
  *
- * To help fund GROMACS development, we humbly ask that you cite
- * the papers people have written on it - you can find them on the website!
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 /* Undefine all defines used below so we can include this file multiple times
@@ -69,6 +76,9 @@
 #undef gmx_invsqrt_pr
 #undef gmx_calc_rsq_pr
 #undef gmx_sum4_pr
+
+#undef gmx_pmecorrF_pr
+#undef gmx_pmecorrV_pr
 
 
 /* By defining GMX_MM128_HERE or GMX_MM256_HERE before including this file
@@ -130,6 +140,9 @@
 #define gmx_calc_rsq_pr   gmx_mm_calc_rsq_ps
 #define gmx_sum4_pr       gmx_mm_sum4_ps
 
+#define gmx_pmecorrF_pr   gmx_mm_pmecorrF_ps
+#define gmx_pmecorrV_pr   gmx_mm_pmecorrV_ps
+
 #else /* ifndef GMX_DOUBLE */
 
 #include "gmx_x86_simd_double.h"
@@ -167,6 +180,9 @@
 #define gmx_invsqrt_pr    gmx_mm_invsqrt_pd
 #define gmx_calc_rsq_pr   gmx_mm_calc_rsq_pd
 #define gmx_sum4_pr       gmx_mm_sum4_pd
+
+#define gmx_pmecorrF_pr   gmx_mm_pmecorrF_pd
+#define gmx_pmecorrV_pr   gmx_mm_pmecorrV_pd
 
 #endif /* ifndef GMX_DOUBLE */
 
@@ -216,6 +232,9 @@
 #define gmx_calc_rsq_pr   gmx_mm256_calc_rsq_ps
 #define gmx_sum4_pr       gmx_mm256_sum4_ps
 
+#define gmx_pmecorrF_pr   gmx_mm256_pmecorrF_ps
+#define gmx_pmecorrV_pr   gmx_mm256_pmecorrV_ps
+
 #else
 
 #include "gmx_x86_simd_double.h"
@@ -255,6 +274,9 @@
 #define gmx_invsqrt_pr    gmx_mm256_invsqrt_pd
 #define gmx_calc_rsq_pr   gmx_mm256_calc_rsq_pd
 #define gmx_sum4_pr       gmx_mm256_sum4_pd
+
+#define gmx_pmecorrF_pr   gmx_mm256_pmecorrF_pd
+#define gmx_pmecorrV_pr   gmx_mm256_pmecorrV_pd
 
 #endif
 

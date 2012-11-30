@@ -1,10 +1,45 @@
+#
+# This file is part of the GROMACS molecular simulation package.
+#
+# Copyright (c) 2012, by the GROMACS development team, led by
+# David van der Spoel, Berk Hess, Erik Lindahl, and including many
+# others, as listed in the AUTHORS file in the top-level source
+# directory and at http://www.gromacs.org.
+#
+# GROMACS is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public License
+# as published by the Free Software Foundation; either version 2.1
+# of the License, or (at your option) any later version.
+#
+# GROMACS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with GROMACS; if not, see
+# http://www.gnu.org/licenses, or write to the Free Software Foundation,
+# Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+#
+# If you want to redistribute modifications to GROMACS, please
+# consider that scientific software is very special. Version
+# control is crucial - bugs must be traceable. We will be happy to
+# consider code for inclusion in the official distribution, but
+# derived work must not be called official GROMACS. Details are found
+# in the README & COPYING files - if they are missing, get the
+# official version at http://www.gromacs.org.
+#
+# To help us fund GROMACS development, we humbly ask that you cite
+# the research papers on the package. Check out http://www.gromacs.org.
+#
 # - Find FFTW 3
 # Find the native FFTW headers and libraries.
 #
 #  ${FFTW}_INCLUDE_DIRS - where to find FFTW headers
 #  ${FFTW}_LIBRARIES    - List of libraries when using FFTW.
 #  ${FFTW}_PKG          - The name of the pkg-config package needed
-#  ${FFTW}_HAVE_SIMD    - True if FFTW was build with SIMD support
+#  ${FFTW}_HAVE_SIMD    - True if FFTW was built with SIMD support
+#  ${FFTW}_HAVE_AVX     - True if FFTW was built with AVX support
 #  ${FFTW}_FOUND        - True if FFTW was found
 #  where ${FFTW} is FFTW or FFTWF
 #
@@ -66,6 +101,16 @@ if (${FFTW}_FOUND)
   if(NOT FOUND_${FFTW}_PLAN)
     message(FATAL_ERROR "Could not find ${${FFTW}_FUNCTION_PREFIX}_plan_r2r_1d in ${${FFTW}_LIBRARY}, take a look at the error message in ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log to find out what went wrong. If you are using a static lib (.a) make sure you have specified all dependencies of ${${FFTW}_PKG} in ${FFTW}_LIBRARY by hand (e.g. -D${FFTW}_LIBRARY='/path/to/lib${${FFTW}_PKG}.so;/path/to/libm.so') !")
   endif(NOT FOUND_${FFTW}_PLAN)
+
+  # Check for FFTW3 compiled with --enable-avx, which is slower for GROMACS than --enable-sse or --enable-sse2
+  foreach(AVX_FUNCTION ${${FFTW}_FUNCTION_PREFIX}_have_simd_avx)
+    check_library_exists("${${FFTW}_LIBRARIES}" "${AVX_FUNCTION}" "" ${FFTW}_HAVE_${AVX_FUNCTION})
+    if(${FFTW}_HAVE_${AVX_FUNCTION})
+      set(${FFTW}_HAVE_AVX TRUE CACHE BOOL "If ${${FFTW}_PKG} was built with AVX support")
+      break()
+    endif(${FFTW}_HAVE_${AVX_FUNCTION})
+  endforeach()
+
   #in 3.3 sse function name has changed
   foreach(SIMD_FCT ${${FFTW}_FUNCTION_PREFIX}_have_simd_sse2;${${FFTW}_FUNCTION_PREFIX}_have_simd_avx;${${FFTW}_FUNCTION_PREFIX}_have_simd_altivec;${${FFTW}_FUNCTION_PREFIX}_have_simd_neon;${${FFTW}_FUNCTION_PREFIX}_have_sse2;${${FFTW}_FUNCTION_PREFIX}_have_sse;${${FFTW}_FUNCTION_PREFIX}_have_altivec)
     check_library_exists("${${FFTW}_LIBRARIES}" "${SIMD_FCT}" "" ${FFTW}_HAVE_${SIMD_FCT})

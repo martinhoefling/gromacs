@@ -1,37 +1,39 @@
-/* -*- mode: c; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; c-file-style: "stroustrup"; -*-
+/*
+ * This file is part of the GROMACS molecular simulation package.
  *
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
- * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
  *
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * GROwing Monsters And Cloning Shrimps
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
+ * of the License, or (at your option) any later version.
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
+ * To help us fund GROMACS development, we humbly ask that you cite
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -1401,9 +1403,11 @@ static void init_forcerec_f_threads(t_forcerec *fr,int nenergrp)
 static void pick_nbnxn_kernel_cpu(FILE *fp,
                                   const t_commrec *cr,
                                   const gmx_cpuid_t cpuid_info,
-                                  int *kernel_type)
+                                  int *kernel_type,
+                                  int *ewald_excl)
 {
     *kernel_type = nbk4x4_PlainC;
+    *ewald_excl  = ewaldexclTable;
 
 #ifdef GMX_X86_SSE2
     {
@@ -1436,6 +1440,23 @@ static void pick_nbnxn_kernel_cpu(FILE *fp,
             gmx_fatal(FARGS,"You requested AVX-256 nbnxn kernels, but GROMACS was built without AVX support");
 #endif
         }
+
+        /* Analytical Ewald exclusion correction is only an option in the
+         * x86 SIMD kernel. This is faster in single precision
+         * on Bulldozer and slightly faster on Sandy Bridge.
+         */
+#if (defined GMX_X86_AVX_128_FMA || defined GMX_X86_AVX_256) && !defined GMX_DOUBLE
+        *ewald_excl = ewaldexclAnalytical;
+#endif
+        if (getenv("GMX_NBNXN_EWALD_TABLE") != NULL)
+        {
+            *ewald_excl = ewaldexclTable;
+        }
+        if (getenv("GMX_NBNXN_EWALD_ANALYTICAL") != NULL)
+        {
+            *ewald_excl = ewaldexclAnalytical;
+        }
+
     }
 #endif /* GMX_X86_SSE2 */
 }
@@ -1445,24 +1466,37 @@ static void pick_nbnxn_kernel(FILE *fp,
                               const gmx_hw_info_t *hwinfo,
                               gmx_bool use_cpu_acceleration,
                               gmx_bool *bUseGPU,
-                              int *kernel_type)
+                              int *kernel_type,
+                              int *ewald_excl,
+                              gmx_bool bDoNonbonded)
 {
-    gmx_bool bEmulateGPU, bGPU;
+    gmx_bool bEmulateGPU, bGPU, bEmulateGPUEnvVarSet;
     char gpu_err_str[STRLEN];
 
     assert(kernel_type);
 
     *kernel_type = nbkNotSet;
+    *ewald_excl  = ewaldexclTable;
+
+    bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
+
     /* if bUseGPU == NULL we don't want a GPU (e.g. hybrid mode kernel selection) */
-    bGPU = (bUseGPU != NULL) && hwinfo->bCanUseGPU;
+    bGPU = ((bUseGPU != NULL) && hwinfo->bCanUseGPU);
 
-    /* Run GPU emulation mode if GMX_EMULATE_GPU is defined or in case if nobonded
-       calculations are turned off via GMX_NO_NONBONDED -- this is the simple way
-       to turn off GPU/CUDA initializations as well.. */
-    bEmulateGPU = ((getenv("GMX_EMULATE_GPU") != NULL) ||
-                   (getenv("GMX_NO_NONBONDED") != NULL));
+    /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. We will
+     * automatically switch to emulation if non-bonded calculations are
+     * turned off via GMX_NO_NONBONDED - this is the simple and elegant
+     * way to turn off GPU initialization, data movement, and cleanup. */
+    bEmulateGPU = (bEmulateGPUEnvVarSet || (!bDoNonbonded && bGPU));
 
-    if (bGPU)
+    /* Enable GPU mode when GPUs are available or GPU emulation is requested.
+     * The latter is useful to assess the performance one can expect by adding
+     * GPU(s) to the machine. The conditional below allows this even if mdrun
+     * is compiled without GPU acceleration support.
+     * Note that such a GPU acceleration performance assessment should be
+     * carried out by setting the GMX_EMULATE_GPU and GMX_NO_NONBONDED env. vars
+     * (and freezing the system as otherwise it would explode). */
+    if (bGPU || bEmulateGPUEnvVarSet)
     {
         if (bEmulateGPU)
         {
@@ -1471,10 +1505,10 @@ static void pick_nbnxn_kernel(FILE *fp,
         else
         {
             /* Each PP node will use the intra-node id-th device from the
-             * list of detected/selected GPUs. */ 
+             * list of detected/selected GPUs. */
             if (!init_gpu(cr->nodeid_group_intra, gpu_err_str, &hwinfo->gpu_info))
             {
-                /* At this point the init should never fail as we made sure that 
+                /* At this point the init should never fail as we made sure that
                  * we have all the GPUs we need. If it still does, we'll bail. */
                 gmx_fatal(FARGS, "On node %d failed to initialize GPU #%d: %s",
                           cr->nodeid,
@@ -1489,7 +1523,10 @@ static void pick_nbnxn_kernel(FILE *fp,
     {
         *kernel_type = nbk8x8x8_PlainC;
 
-        md_print_warn(cr, fp, "Emulating a GPU run on the CPU (slow)");
+        if (bDoNonbonded)
+        {
+            md_print_warn(cr, fp, "Emulating a GPU run on the CPU (slow)");
+        }
     }
     else if (bGPU)
     {
@@ -1500,7 +1537,8 @@ static void pick_nbnxn_kernel(FILE *fp,
     {
         if (use_cpu_acceleration)
         {
-            pick_nbnxn_kernel_cpu(fp,cr,hwinfo->cpuid_info,kernel_type);
+            pick_nbnxn_kernel_cpu(fp,cr,hwinfo->cpuid_info,
+                                  kernel_type,ewald_excl);
         }
         else
         {
@@ -1508,7 +1546,7 @@ static void pick_nbnxn_kernel(FILE *fp,
         }
     }
 
-    if (fp != NULL)
+    if (bDoNonbonded && fp != NULL)
     {
         if (MASTER(cr))
         {
@@ -1722,7 +1760,9 @@ static void init_nb_verlet(FILE *fp,
         {
             pick_nbnxn_kernel(fp, cr, fr->hwinfo, fr->use_cpu_acceleration,
                               &nbv->bUseGPU,
-                              &nbv->grp[i].kernel_type);
+                              &nbv->grp[i].kernel_type,
+                              &nbv->grp[i].ewald_excl,
+                              fr->bNonbonded);
         }
         else /* non-local */
         {
@@ -1731,7 +1771,9 @@ static void init_nb_verlet(FILE *fp,
                 /* Use GPU for local, select a CPU kernel for non-local */
                 pick_nbnxn_kernel(fp, cr, fr->hwinfo, fr->use_cpu_acceleration,
                                   NULL,
-                                  &nbv->grp[i].kernel_type);
+                                  &nbv->grp[i].kernel_type,
+                                  &nbv->grp[i].ewald_excl,
+                                  fr->bNonbonded);
 
                 bHybridGPURun = TRUE;
             }
@@ -1739,6 +1781,7 @@ static void init_nb_verlet(FILE *fp,
             {
                 /* Use the same kernel for local and non-local interactions */
                 nbv->grp[i].kernel_type = nbv->grp[0].kernel_type;
+                nbv->grp[i].ewald_excl  = nbv->grp[0].ewald_excl;
             }
         }
     }

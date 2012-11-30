@@ -1,41 +1,45 @@
 
 /*
- * 
- *                This source code is part of
- * 
- *                 G   R   O   M   A   C   S
- * 
- *          GROningen MAchine for Chemical Simulations
- * 
- *                        VERSION 3.2.0
- * Written by David van der Spoel, Erik Lindahl, Berk Hess, and others.
+ * This file is part of the GROMACS molecular simulation package.
+ *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
-
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
+ * Copyright (c) 2012, by the GROMACS development team, led by
+ * David van der Spoel, Berk Hess, Erik Lindahl, and including many
+ * others, as listed in the AUTHORS file in the top-level source
+ * directory and at http://www.gromacs.org.
+ *
+ * GROMACS is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
- * If you want to redistribute modifications, please consider that
- * scientific software is very special. Version control is crucial -
- * bugs must be traceable. We will be happy to consider code for
- * inclusion in the official distribution, but derived work must not
- * be called official GROMACS. Details are found in the README & COPYING
- * files - if they are missing, get the official version at www.gromacs.org.
- * 
+ *
+ * GROMACS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with GROMACS; if not, see
+ * http://www.gnu.org/licenses, or write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA.
+ *
+ * If you want to redistribute modifications to GROMACS, please
+ * consider that scientific software is very special. Version
+ * control is crucial - bugs must be traceable. We will be happy to
+ * consider code for inclusion in the official distribution, but
+ * derived work must not be called official GROMACS. Details are found
+ * in the README & COPYING files - if they are missing, get the
+ * official version at http://www.gromacs.org.
+ *
  * To help us fund GROMACS development, we humbly ask that you cite
- * the papers on the package - you can find them in the top README file.
- * 
- * For more info, check our website at http://www.gromacs.org
- * 
- * And Hey:
- * Gromacs Runs On Most of All Computer Systems
+ * the research papers on the package. Check out http://www.gromacs.org.
  */
 
 #ifndef _fatal_h
 #define _fatal_h
+#include "visibility.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -64,6 +68,7 @@ extern "C" {
 #endif
 #endif
   
+GMX_LIBGMX_EXPORT
 void 
 _where(const char *file,int line);
 #define where() _where(__FILE__,__LINE__)
@@ -79,6 +84,7 @@ _unset_fatal_tmp_file(const char *fn, const char *file, int line);
 #define unset_fatal_tmp_file(fn) _unset_fatal_tmp_file(fn,__FILE__,__LINE__)
 /* unsets filename to be removed */
 
+GMX_LIBGMX_EXPORT
 void 
 gmx_fatal(int fatal_errno,const char *file,int line,const char *fmt,...) GMX_ATTRIBUTE_NORETURN;
 #define FARGS 0,__FILE__,__LINE__
@@ -108,6 +114,7 @@ void
 gmx_fatal_set_log_file(FILE *fp);
 /* Set the log file for printing error messages */
   
+GMX_LIBGMX_EXPORT
 void 
 _invalid_case(const char *fn,int line);
 #define invalid_case() _invalid_case(__FILE__,__LINE__)
@@ -122,11 +129,14 @@ void _unexpected_eof(const char *fn,int line,const char *srcfn,int srcline);
  * the file is not NULL:
  * if (debug) fprintf(debug,"%s","Hallo");
  */
+GMX_LIBGMX_EXPORT
 extern FILE *debug;
+GMX_LIBGMX_EXPORT
 extern gmx_bool gmx_debug_at;
 
 void init_debug (const int dbglevel,const char *dbgfile);
   
+GMX_LIBGMX_EXPORT
 gmx_bool bDebugMode(void);
 /* Return TRUE when the program was started in debug mode */
   
@@ -137,6 +147,7 @@ void doexceptions(void);
 
   /* warn_str is allowed to be NULL.
    */
+GMX_LIBGMX_EXPORT
   void _range_check(int n,int n_min,int n_max,const char *warn_str,
 			   const char *var,
 			   const char *file,int line);
@@ -159,6 +170,7 @@ void doexceptions(void);
    * The messages are stored in src/gmxlib/fatal.c
    */
   
+GMX_LIBGMX_EXPORT
   void _gmx_error(const char *key,const char *msg,const char *file,int line) GMX_ATTRIBUTE_NORETURN;
 #define gmx_error(key,msg) _gmx_error(key,msg,__FILE__,__LINE__)
   /* Error msg of type key is generated and the program is 
@@ -187,6 +199,7 @@ set_gmx_error_handler(void (*func)(const char *msg));
    * The string may be a multi-line string.
    */
 
+GMX_LIBGMX_EXPORT
 void gmx_warning(const char *fmt,...);
 /* Print a warning message to stderr.
  * The format of fmt is that like printf etc, only %d, %x, %c, %f, %g and %s
