@@ -57,7 +57,7 @@ mark_as_advanced(DART_ROOT)
 # machine with no git. 
 #
 # NOTE: when releasing the "-dev" suffix needs to be stripped off!
-set(PROJECT_VERSION "4.6-beta1")
+set(PROJECT_VERSION "4.6-beta1-dev")
 set(CUSTOM_VERSION_STRING ""
     CACHE STRING "Custom version string (if empty, use hard-coded default)")
 mark_as_advanced(CUSTOM_VERSION_STRING)
@@ -146,7 +146,10 @@ endif()
 # decide on GPU settings based on user-settings and GPU/CUDA detection
 include(gmxManageGPU)
 
-option(GMX_OPENMM "Accelerated execution on GPUs through the OpenMM library (rerun cmake after changing to see relevant options)" OFF)
+# TODO: move OpenMM to contrib
+option(GMX_OPENMM "Accelerated execution on GPUs through the OpenMM library (not fully supported)" OFF)
+mark_as_advanced(GMX_OPENMM)
+
 option(GMX_FORCE_CXX "Enable C++ compilation even if not necessary" OFF)
 mark_as_advanced(GMX_FORCE_CXX)
 
