@@ -31,6 +31,7 @@ add_library(gmxana
             gmx_hydorder.c  gmx_densorder.c powerspect.c    dens_filter.c
             binsearch.c     gmx_dyecoupl.c  gmx_make_edi.c  gmx_sigeps.c
             gmx_do_dssp.c   gmx_anadock.c   gmx_make_ndx.c  gmx_mk_angndx.c
+	    gmx_saxs.c
             )
 
 
@@ -47,7 +48,7 @@ set(GMX_TOOLS_PROGRAMS
     xpm2ps genion g_anadock make_edi g_analyze g_anaeig
     g_angle g_bond g_bundle g_chi g_cluster g_confrms g_covar
     g_current g_density g_densmap g_dih g_dielectric
-    g_helixorient g_principal g_dipoles g_disre g_dist
+    g_helixorient g_principal g_dipoles g_disre
     g_dyndom g_enemat g_energy g_lie g_filter g_gyrate
     g_h2order g_hbond g_helix g_mindist g_msd g_morph g_nmeig
     g_nmens g_order g_kinetics g_polystat g_potential g_rama g_rdf g_rms
@@ -55,7 +56,7 @@ set(GMX_TOOLS_PROGRAMS
     g_spol g_spatial g_tcaf g_traj g_tune_pme g_vanhove
     g_velacc g_clustsize g_mdmat g_wham g_sigeps g_bar
     g_pme_error g_rmsdist g_rotmat g_options
-    g_dos    g_hydorder  g_densorder g_dyecoupl g_sans
+    g_dos    g_hydorder  g_densorder g_dyecoupl g_sans  g_saxs
     )
 
 set(GMX_TOOLS_PROGRAMS_NOT_FOR_INSTALLATION
