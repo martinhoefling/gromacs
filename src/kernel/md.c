@@ -583,7 +583,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
     {
         nstfep = ir->expandedvals->nstexpanded;
     }
-    if (repl_ex_nst > 0 && repl_ex_nst > nstfep)
+    if (repl_ex_nst > 0 && nstfep > repl_ex_nst)
     {
         nstfep = repl_ex_nst;
     }
@@ -1304,6 +1304,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                 {
                     if (bTrotter)
                     {
+                        m_add(force_vir,shake_vir,total_vir); /* we need the un-dispersion corrected total vir here */
                         trotter_update(ir,step,ekind,enerd,state,total_vir,mdatoms,&MassQ,trotter_seq,ettTSEQ2);
                     } 
                     else 
@@ -1593,8 +1594,9 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
         /* at the start of step, randomize the velocities */
         if (ETC_ANDERSEN(ir->etc) && EI_VV(ir->eI))
         {
-            gmx_bool bDoAndersenConstr;
-            bDoAndersenConstr = (constr && update_randomize_velocities(ir,step,mdatoms,state,upd,&top->idef,constr));
+            gmx_bool bDoAndersenConstr,bIfRandomize;
+            bIfRandomize = update_randomize_velocities(ir,step,mdatoms,state,upd,&top->idef,constr);
+            bDoAndersenConstr = (constr && bIfRandomize);
             /* if we have constraints, we have to remove the kinetic energy parallel to the bonds */
             if (bDoAndersenConstr)
             {
@@ -1976,7 +1978,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             state->fep_state = lamnew;
             for (i=0;i<efptNR;i++)
             {
-                state->lambda[i] = ir->fepvals->all_lambda[i][lamnew];
+                state_global->lambda[i] = ir->fepvals->all_lambda[i][lamnew];
             }
         }
         /* Remaining runtime */
