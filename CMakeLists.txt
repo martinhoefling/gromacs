@@ -40,6 +40,10 @@ set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
 set(CPACK_COMPONENT_GROUP_TOOLS_DESCRIPTION "All GROMACS executable tools")
 set(CPACK_COMPONENT_GROUP_MDRUN_DESCRIPTION "GROMACS executable for running simulations")
 
+# CMake modules/macros are in a subdirectory to keep this file cleaner
+# This needs to be set before project() in order to pick up toolchain files
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Platform)
+
 project(Gromacs C)
 include(Dart)
 mark_as_advanced(DART_ROOT)
@@ -80,9 +84,6 @@ endif()
 # The #define GMX_API_VERSION in version.h is set to this value to
 # provide backward compatibility of software written against the Gromacs API.
 set(API_VERSION ${NUM_VERSION})
-
-# Cmake modules/macros are in a subdirectory to keep this file cleaner
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX)
 set(CMAKE_INSTALL_PREFIX "/usr/local/gromacs" CACHE STRING "Installation prefix (installation will need write permissions here)" FORCE)
@@ -166,6 +167,7 @@ IF( WIN32 AND NOT CYGWIN)
     SET(SHARED_LIBS_DEFAULT OFF)
   else()
     add_definitions(-DUSE_VISIBILITY -DTMPI_USE_VISIBILITY)
+    set(PKG_CFLAGS "$PKG_CFLAGS -DUSE_VISIBILITY -DTMPI_USE_VISIBILITY")
   endif()
 
   IF (GMX_PREFER_STATIC_LIBS)
@@ -210,8 +212,6 @@ option(GMX_MPI    "Build a parallel (message-passing) version of GROMACS" OFF)
 option(GMX_THREAD_MPI  "Build a thread-MPI-based multithreaded version of GROMACS (not compatible with MPI)" ON)
 option(GMX_SOFTWARE_INVSQRT "Use GROMACS software 1/sqrt" ON)
 mark_as_advanced(GMX_SOFTWARE_INVSQRT)
-option(GMX_POWERPC_INVSQRT "Use PowerPC hardware 1/sqrt" OFF)
-mark_as_advanced(GMX_POWERPC_INVSQRT)
 option(GMX_FAHCORE "Build a library with mdrun functionality" OFF)
 mark_as_advanced(GMX_FAHCORE)
 
@@ -373,9 +373,6 @@ endif(GMX_DOUBLE)
 if(GMX_SOFTWARE_INVSQRT)
   set(PKG_CFLAGS "${PKG_CFLAGS} -DGMX_SOFTWARE_INVSQRT")
 endif(GMX_SOFTWARE_INVSQRT)
-if(GMX_POWERPC_INVSQRT)
-  set(PKG_CFLAGS "${PKG_CFLAGS} -DGMX_POWERPC_INVSQRT")
-endif(GMX_POWERPC_INVSQRT)
 
 if(GMX_IMD)
 	if(WIN32 AND NOT CYGWIN)
@@ -887,7 +884,6 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "BLUEGENE")
         set(BUILD_SHARED_LIBS OFF CACHE BOOL "Shared libraries not compatible with BlueGene/L, disabled!" FORCE)
     endif (${CMAKE_SYSTEM_NAME} STREQUAL "BlueGeneL")
     set(GMX_SOFTWARE_INVSQRT OFF CACHE BOOL "Do not use software reciprocal square root on BlueGene" FORCE)
-    set(GMX_POWERPC_INVSQRT ON CACHE BOOL "Use hardware reciprocal square root on BlueGene" FORCE)
     set(GMX_X11 OFF CACHE BOOL "X11 not compatible with BlueGene, disabled!" FORCE)
     set(GMX_THREAD_MPI OFF CACHE BOOL "Thread-MPI not compatible with BlueGene, disabled!" FORCE)
     set(GMX_MPI ON CACHE BOOL "Use MPI on BlueGene" FORCE)
@@ -898,10 +894,6 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "BLUEGENE")
 # The automatic testing for endianness does not work for the BlueGene cross-compiler
     set(GMX_IEEE754_BIG_ENDIAN_BYTE_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP byte order (by default)" FORCE)
     set(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP word order (by default)" FORCE)
-elseif(${GMX_CPU_ACCELERATION} STREQUAL "POWER6")
-    set(GMX_POWER6 1)
-    set(GMX_SOFTWARE_INVSQRT OFF CACHE BOOL "Do not use software reciprocal square root on Power6" FORCE)
-    set(GMX_POWERPC_INVSQRT ON CACHE BOOL "Use hardware reciprocal square root on Power6" FORCE)
 else(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
     MESSAGE(FATAL_ERROR "Unrecognized option for accelerated kernels: ${GMX_CPU_ACCELERATION}. Pick one of None, SSE2, SSE4.1, AVX_128_FMA, AVX_256, BlueGene")
 endif(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
@@ -1103,6 +1095,7 @@ if(NOT GMX_OPENMP)
     unset(OpenMP_LINKER_FLAGS CACHE)
     unset(OpenMP_SHARED_LINKER_FLAGS)
 endif()
+set(PKG_CFLAGS "${PKG_CFLAGS} ${OpenMP_C_FLAGS}")
 
 ######################################
 # Output compiler and CFLAGS used
