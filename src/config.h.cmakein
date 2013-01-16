@@ -67,9 +67,6 @@
  */
 #cmakedefine GMX_FLOAT_FORMAT_IEEE754
 
-/* Use assembly intrinsics kernels for BlueGene */
-#cmakedefine GMX_BLUEGENE
-
 /* Work around broken calloc() */
 #cmakedefine GMX_BROKEN_CALLOC
 
@@ -106,6 +103,9 @@
 /* AVX 256-bit instructions available */
 #cmakedefine GMX_X86_AVX_256
 
+/* GCC bug in AVX maskload/maskstore arguments - worked around internally */
+#cmakedefine GMX_X86_AVX_GCC_MASKLOAD_BUG
+
 /* SSE2 was selected as CPU acceleration level */
 #cmakedefine GMX_CPU_ACCELERATION_X86_SSE2
 
@@ -117,6 +117,9 @@
 
 /* AVX 256-bit was selected as CPU acceleration level */
 #cmakedefine GMX_CPU_ACCELERATION_X86_AVX_256
+
+/* IBM QPX was selected as CPU acceleration type (e.g. BlueGene/Q) */
+#cmakedefine GMX_CPU_ACCELERATION_IBM_QPX
 
 /* String for CPU acceleration choice (for writing to log files and stdout) */
 #define GMX_CPU_ACCELERATION_STRING "@GMX_CPU_ACCELERATION@"
@@ -453,8 +456,8 @@
 /* Build special-purpose mdrun library */
 #cmakedefine GMX_FAHCORE   
 
-/* Disable gromacs quotes */
-#cmakedefine GMX_NO_QUOTES
+/* Enable gromacs quotes */
+#cmakedefine GMX_COOL_QUOTES
 
 #ifdef GMX_FAHCORE
 #define FULLINDIRECT 1

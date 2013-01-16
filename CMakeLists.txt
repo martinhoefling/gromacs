@@ -149,60 +149,13 @@ mark_as_advanced(GMX_OPENMM)
 option(GMX_FORCE_CXX "Enable C++ compilation even if not necessary" OFF)
 mark_as_advanced(GMX_FORCE_CXX)
 
-option(GMX_NO_QUOTES "Disable Gromacs cool quotes" OFF)
+option(GMX_COOL_QUOTES "Enable Gromacs cool quotes" ON)
+mark_as_advanced(GMX_COOL_QUOTES)
 
 if(GMX_GPU OR GMX_OPENMM OR GMX_FORCE_CXX)
     enable_language(CXX)
 endif()
 set(CMAKE_PREFIX_PATH "" CACHE STRING "Extra locations to search for external libraries and tools (give directory without lib, bin, or include)")
-
-########################################################################
-# Fix stupid flags on Windows
-########################################################################
-SET(SHARED_LIBS_DEFAULT ON) 
-IF( WIN32 AND NOT CYGWIN)
-  if (NOT BUILD_SHARED_LIBS)
-    option(GMX_PREFER_STATIC_LIBS "When finding libraries prefer static system libraries (MT instead of MD)!" ON)
-    mark_as_advanced(GMX_PREFER_STATIC_LIBS)
-    SET(SHARED_LIBS_DEFAULT OFF)
-  else()
-    add_definitions(-DUSE_VISIBILITY -DTMPI_USE_VISIBILITY)
-    set(PKG_CFLAGS "$PKG_CFLAGS -DUSE_VISIBILITY -DTMPI_USE_VISIBILITY")
-  endif()
-
-  IF (GMX_PREFER_STATIC_LIBS)
-    #Only setting Debug and Release flags. Others configurations current not used.
-    STRING(REPLACE /MD /MT CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
-    SET(CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE} CACHE STRING "" FORCE)
-    STRING(REPLACE /MD /MT CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
-    SET(CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG} CACHE STRING "" FORCE)
-    if(CMAKE_CXX_COMPILER_LOADED)
-        STRING(REPLACE /MD /MT CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
-        SET(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} CACHE STRING "" FORCE)
-        STRING(REPLACE /MD /MT CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
-        SET(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG} CACHE STRING "" FORCE)
-    endif()
-  ENDIF()
-
-  #Workaround for cmake bug 13174. Replace deprecated options.
-  IF( CMAKE_C_COMPILER_ID MATCHES "Intel" )
-    if(BUILD_SHARED_LIBS)
-        STRING(REPLACE "/INCREMENTAL:YES" "" CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS})
-        SET(CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS} CACHE STRING "" FORCE)
-    endif()
-    STRING(REPLACE /GZ /RTC1 CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
-    SET(CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG} CACHE STRING "" FORCE)
-  ENDIF()
-  IF( CMAKE_CXX_COMPILER_ID MATCHES "Intel" AND CMAKE_CXX_COMPILER_LOADED)
-    STRING(REPLACE /GZ /RTC1 CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
-    STRING(REPLACE /GX /EHsc CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
-    SET(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG} CACHE STRING "" FORCE)
-
-    STRING(REPLACE /GX /EHsc CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
-    SET(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} CACHE STRING "" FORCE)
-  ENDIF()
-ENDIF()
-
 
 ########################################################################
 # User input options                                                   #
@@ -218,14 +171,18 @@ mark_as_advanced(GMX_FAHCORE)
 include(gmxDetectAcceleration)
 if(NOT DEFINED GMX_CPU_ACCELERATION)
     if(CMAKE_CROSSCOMPILING)
-        set(GMX_SUGGESTED_CPU_ACCELERATION "None")
+        if("${CMAKE_SYSTEM_NAME}" MATCHES "BlueGeneQ")
+            set(GMX_SUGGESTED_CPU_ACCELERATION "IBM_QPX")
+        else()
+            set(GMX_SUGGESTED_CPU_ACCELERATION "None")
+        endif()
     else(CMAKE_CROSSCOMPILING)
         gmx_detect_acceleration(GMX_SUGGESTED_CPU_ACCELERATION)
     endif(CMAKE_CROSSCOMPILING)
 endif(NOT DEFINED GMX_CPU_ACCELERATION)
 
 set(GMX_CPU_ACCELERATION "@GMX_SUGGESTED_CPU_ACCELERATION@"
-    CACHE STRING "Accelerated CPU kernels. Pick one of: None, SSE2, SSE4.1, AVX_128_FMA, AVX_256, BlueGene")
+    CACHE STRING "Accelerated CPU kernels. Pick one of: None, SSE2, SSE4.1, AVX_128_FMA, AVX_256, IBM_QPX")
 
 set(GMX_FFT_LIBRARY "fftw3" 
     CACHE STRING "FFT library choices: fftw3,mkl,fftpack[built-in]")
@@ -259,6 +216,9 @@ endif()
 option(GMX_CYCLE_SUBCOUNTERS "Enable cycle subcounters to get a more detailed cycle timings" OFF)
 mark_as_advanced(GMX_CYCLE_SUBCOUNTERS)
 
+option(GMX_SKIP_DEFAULT_CFLAGS "Don't automatically add suggested/required Compiler flags." OFF)
+mark_as_advanced(GMX_SKIP_DEFAULT_CFLAGS)
+
 ######################################################################
 # Compiler tests
 # These need to be done early (before further tests).
@@ -272,6 +232,16 @@ mark_as_advanced(GMX_CYCLE_SUBCOUNTERS)
 include(CheckCCompilerFlag)
 if(CMAKE_CXX_COMPILER_LOADED)
     include(CheckCXXCompilerFlag)
+endif()
+
+# First exclude compilers known to not work with OpenMP although claim to support it:
+# gcc 4.2.1 and gcc-llvm 4.2.1 (also claims to be 4.2.1) on Mac OS X
+# This fixes redmine 900 and needs to run before OpenMP flags are set below.
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+    CMAKE_COMPILER_IS_GNUCC AND C_COMPILER_VERSION VERSION_LESS 4.3)
+    message(STATUS "OpenMP multithreading not supported with gcc/llvm-gcc 4.2 on Mac OS X, disabled")
+    set(GMX_OPENMP OFF CACHE BOOL
+        "OpenMP multithreading not not supported with gcc/llvm-gcc 4.2 on Mac OS X, disabled!" FORCE)
 endif()
 
 # OpenMP check must come before other CFLAGS!
@@ -395,11 +365,6 @@ if(GMX_IMD)
 else()
 	message(STATUS "IMD Disabled.")
 endif(GMX_IMD)
-
-########################################################################
-#Process MPI settings
-########################################################################
-include(gmxManageMPI)
 
 #######################################################################
 # Check for options incompatible with OpenMM build                    #
@@ -551,27 +516,91 @@ include(TestBigEndian)
 test_big_endian(GMX_INTEGER_BIG_ENDIAN)
 
 
+if(APPLE OR CYGWIN OR ${CMAKE_SYSTEM_NAME} MATCHES "Linux|.*BSD")
+    # Maybe Solaris should be here? Patch this if you know!
+    SET(SHARED_LIBS_DEFAULT ON)
+elseif(WIN32 OR ${CMAKE_SYSTEM_NAME} MATCHES "BlueGene")
+    # Support for shared libs on native Windows is a bit new. Its
+    # default might change later if/when we sort things out. Also,
+    # Cray should go here. What variable value can detect it?
+    SET(SHARED_LIBS_DEFAULT OFF)
+else()
+    message(STATUS "Defaulting to building static libraries")
+    SET(SHARED_LIBS_DEFAULT OFF)
+endif()
 
+# Management of GROMACS options for specific toolchains should go
+# here. Because the initial settings for some of the main options have
+# already happened, but things like library detection and MPI compiler
+# feature detection have not, the docstrings for any over-rides of
+# GROMACS defaults or user settings will make sense. Also, any
+# toolchain-related reasons for choosing whether to detect various
+# things can be sorted out now, before the detection takes place.
+if(${CMAKE_SYSTEM_NAME} MATCHES BlueGene)
+    include(gmxManageBlueGene)
+endif()
+
+if(UNIX AND GMX_PREFER_STATIC_LIBS AND SHARED_LIBS_DEFAULT)
+    if(BUILD_SHARED_LIBS)
+        # Warn the user about the combination. But don't overwrite the request.
+        message(WARNING "Searching for static libraries requested, and building shared Gromacs libraries requested. This might cause problems linking later.")
+    elseif(NOT DEFINED BUILD_SHARED_LIBS)
+        # Change default to OFF. Don't warn if it's already off.
+        message(WARNING "Searching for static libraries requested, so the GROMACS libraries will also be built statically (BUILD_SHARED_LIBS=OFF)")
+        set(SHARED_LIBS_DEFAULT OFF)
+    endif()
+endif()
+
+# By now, all tool chains should have spoken up if they care about
+# the setting of SHARED_LIBS_DEFAULT.
+option(BUILD_SHARED_LIBS "Enable shared libraries (can be problematic e.g. with MPI, or on some HPC systems)" ${SHARED_LIBS_DEFAULT})
+
+########################################################################
+#Process MPI settings
+########################################################################
+include(gmxManageMPI)
 
 ########################################################################
 # Find external packages                                               #
 ########################################################################
-if(UNIX)
-    if(GMX_PREFER_STATIC_LIBS)
-        # On Linux .a is the static library suffix, on Mac OS X .lib can also
-        # be used, so we'll add both to the preference list.
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES ".lib;.a" ${CMAKE_FIND_LIBRARY_SUFFIXES})
-        if(SHARED_LIBS_DEFAULT)
-            if(BUILD_SHARED_LIBS) #Warn the user about the combination. But don't overwrite the request.
-                message(WARNING "Static libraries requested, and shared Gromacs libraries requested.")
-            elseif(NOT DEFINED BUILD_SHARED_LIBS) #Change default to OFF. Don't warn if it's already off.
-                message(WARNING "Static libraries requested, the GROMACS libraries will also be build static (BUILD_SHARED_LIBS=OFF)")
-                set(SHARED_LIBS_DEFAULT OFF)
-            endif()
-        endif()
-    endif()
+if(UNIX AND GMX_PREFER_STATIC_LIBS)
+    # On Linux .a is the static library suffix, on Mac OS X .lib can also
+    # be used, so we'll add both to the preference list.
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES ".lib;.a" ${CMAKE_FIND_LIBRARY_SUFFIXES})
 endif()
-option(BUILD_SHARED_LIBS "Enable shared libraries (can be problematic with MPI, Windows)" ${SHARED_LIBS_DEFAULT})
+
+IF( WIN32 AND NOT CYGWIN)
+  if (NOT BUILD_SHARED_LIBS)
+      option(GMX_PREFER_STATIC_LIBS "When finding libraries prefer static system libraries (MT instead of MD)!" ON)
+      if(NOT GMX_PREFER_STATIC_LIBS)
+          message(WARNING "Shared system libraries requested, and static Gromacs libraries requested.")
+      endif()
+  else()
+      option(GMX_PREFER_STATIC_LIBS "When finding libraries prefer static system libraries (MT instead of MD)!" OFF)
+      if(GMX_PREFER_STATIC_LIBS)
+          #this combination segfaults (illigal passing of file handles)
+          message(FATAL_ERROR "Static system libraries requested, and shared Gromacs libraries requested.")
+      endif()
+      add_definitions(-DUSE_VISIBILITY -DTMPI_USE_VISIBILITY)
+      set(PKG_CFLAGS "$PKG_CFLAGS -DUSE_VISIBILITY -DTMPI_USE_VISIBILITY")
+  endif()
+  mark_as_advanced(GMX_PREFER_STATIC_LIBS)
+
+  IF (GMX_PREFER_STATIC_LIBS)
+      #Only setting Debug and Release flags. Others configurations are current not used.
+      STRING(REPLACE /MD /MT CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+      STRING(REPLACE /MD /MT CMAKE_C_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
+      if(CMAKE_CXX_COMPILER_LOADED)
+          STRING(REPLACE /MD /MT CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+          STRING(REPLACE /MD /MT CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
+      endif()
+  ENDIF()
+  IF( CMAKE_C_COMPILER_ID MATCHES "Intel" )
+    if(BUILD_SHARED_LIBS) #not sure why incremental building with shared libs doesn't work
+        STRING(REPLACE "/INCREMENTAL:YES" "" CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS})
+    endif()
+  ENDIF()
+ENDIF()
 
 option(GMX_GSL "Add support for gsl" OFF)
 if (GMX_GSL)
@@ -714,28 +743,31 @@ if(NOT GMX_SYSTEM_XDR)
     set(PKG_CFLAGS "${PKG_CFLAGS} -DGMX_INTERNAL_XDR")
 endif(NOT GMX_SYSTEM_XDR)
 
+# include avx test source, used if the AVX flags are set below
+include(gmxTestAVXMaskload)
+
 # Process nonbonded accelerated kernels settings
 string(TOUPPER ${GMX_CPU_ACCELERATION} ${GMX_CPU_ACCELERATION})
 if(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
     # nothing to do
 elseif(${GMX_CPU_ACCELERATION} STREQUAL "SSE2")
 
-    GMX_TEST_CFLAG(GNU_SSE2_CFLAG "-msse2" GROMACS_C_FLAGS)
+    GMX_TEST_CFLAG(GNU_SSE2_CFLAG "-msse2" ACCELERATION_C_FLAGS)
     if(NOT GNU_SSE2_CFLAG AND GMX_NATIVE_WINDOWS)
-        GMX_TEST_CFLAG(MSVC_SSE2_CFLAG "/arch:SSE2" GROMACS_C_FLAGS)
+        GMX_TEST_CFLAG(MSVC_SSE2_CFLAG "/arch:SSE2" ACCELERATION_C_FLAGS)
     endif(NOT GNU_SSE2_CFLAG AND GMX_NATIVE_WINDOWS)
 
     if (CMAKE_CXX_COMPILER_LOADED)
-        GMX_TEST_CXXFLAG(GNU_SSE2_CXXFLAG "-msse2" GROMACS_CXX_FLAGS)
+        GMX_TEST_CXXFLAG(GNU_SSE2_CXXFLAG "-msse2" ACCELERATION_CXX_FLAGS)
         if(NOT GNU_SSE2_CXXFLAG AND GMX_NATIVE_WINDOWS)
-            GMX_TEST_CXXFLAG(MSVC_SSE2_CXXFLAG "/arch:SSE2" GROMACS_CXX_FLAGS)
+            GMX_TEST_CXXFLAG(MSVC_SSE2_CXXFLAG "/arch:SSE2" ACCELERATION_CXX_FLAGS)
         endif(NOT GNU_SSE2_CXXFLAG AND GMX_NATIVE_WINDOWS)
     endif()
 
     # We dont warn for lacking SSE2 flag support, since that is probably standard today.
 
     # Only test the include after we have tried to add the correct flag for SSE2 support
-    check_include_file(emmintrin.h  HAVE_EMMINTRIN_H ${GROMACS_C_FLAGS})
+    check_include_file(emmintrin.h  HAVE_EMMINTRIN_H ${ACCELERATION_C_FLAGS})
 
     if(NOT HAVE_EMMINTRIN_H)
         message(FATAL_ERROR "Cannot find emmintrin.h, which is required for SSE2 intrinsics support.")
@@ -750,36 +782,38 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "SSE2")
 
 elseif(${GMX_CPU_ACCELERATION} STREQUAL "SSE4.1")
 
-    GMX_TEST_CFLAG(GNU_SSE4_CFLAG "-msse4.1" GROMACS_C_FLAGS)
+    GMX_TEST_CFLAG(GNU_SSE4_CFLAG "-msse4.1" ACCELERATION_C_FLAGS)
     if (NOT GNU_SSE4_CFLAG AND GMX_NATIVE_WINDOWS)
-        GMX_TEST_CFLAG(MSVC_SSE4_CFLAG "/arch:SSE4.1" GROMACS_C_FLAGS)
+        GMX_TEST_CFLAG(MSVC_SSE4_CFLAG "/arch:SSE4.1" ACCELERATION_C_FLAGS)
     endif(NOT GNU_SSE4_CFLAG AND GMX_NATIVE_WINDOWS)
     if (NOT GNU_SSE4_CFLAG AND NOT MSVC_SSE4_CFLAG)
-        message(WARNING "No C SSE4.1 flag found. Consider a newer compiler, or use SSE2 for slightly lower performance.")
         # Not surprising if we end up here! MSVC current does not support the SSE4.1 flag. However, it appears to accept SSE4.1
-        # intrinsics when SSE2 support is enabled, so we try that instead.
+        # intrinsics when SSE2 support is enabled, so we try that instead first.
 	if (GMX_NATIVE_WINDOWS)
-            GMX_TEST_CFLAG(MSVC_SSE2_CFLAG "/arch:SSE2" GROMACS_C_FLAGS)
+            GMX_TEST_CFLAG(MSVC_SSE2_CFLAG "/arch:SSE2" ACCELERATION_C_FLAGS)
+            message(WARNING "Neither SSE4.1 or SSE2 seems to be supported by your Windows compiler. Something is likely broken.")
+        else()
+            message(WARNING "No C SSE4.1 flag found. Consider a newer compiler, or use SSE2 for slightly lower performance")
         endif()
     endif(NOT GNU_SSE4_CFLAG AND NOT MSVC_SSE4_CFLAG)
 
     if (CMAKE_CXX_COMPILER_LOADED)
-        GMX_TEST_CXXFLAG(GNU_SSE4_CXXFLAG "-msse4.1" GROMACS_CXX_FLAG)
+        GMX_TEST_CXXFLAG(GNU_SSE4_CXXFLAG "-msse4.1" ACCELERATION_CXX_FLAGS)
         if (NOT GNU_SSE4_CXXFLAG AND GMX_NATIVE_WINDOWS)
-            GMX_TEST_CXXFLAG(MSVC_SSE4_CXXFLAG "/arch:SSE4.1" GROMACS_CXX_FLAGS)
+            GMX_TEST_CXXFLAG(MSVC_SSE4_CXXFLAG "/arch:SSE4.1" ACCELERATION_CXX_FLAGS)
         endif(NOT GNU_SSE4_CXXFLAG AND GMX_NATIVE_WINDOWS)
         if (NOT GNU_SSE4_CXXFLAG AND NOT MSVC_SSE4_CXXFLAG) 
             message(WARNING "No C++ SSE4.1 flag found. Consider a newer compiler, or use SSE2 for slightly lower performance.")
             # Not surprising if we end up here! MSVC current does not support the SSE4.1 flag. However, it appears to accept SSE4.1
             # intrinsics when SSE2 support is enabled, so we try that instead.
             if (GMX_NATIVE_WINDOWS)
-                GMX_TEST_CXXFLAG(MSVC_SSE2_CXXFLAG "/arch:SSE2" GROMACS_CXX_FLAGS)
+                GMX_TEST_CXXFLAG(MSVC_SSE2_CXXFLAG "/arch:SSE2" ACCELERATION_CXX_FLAGS)
             endif()
         endif(NOT GNU_SSE4_CXXFLAG AND NOT MSVC_SSE4_CXXFLAG)
     endif()
 
     # This must come after we have added the -msse4.1 flag on some platforms.
-    check_include_file(smmintrin.h  HAVE_SMMINTRIN_H ${GROMACS_C_FLAGS})
+    check_include_file(smmintrin.h  HAVE_SMMINTRIN_H ${ACCELERATION_C_FLAGS})
 
     if(NOT HAVE_SMMINTRIN_H)
         message(FATAL_ERROR "Cannot find smmintrin.h, which is required for SSE4.1 intrinsics support.")
@@ -797,18 +831,18 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
 
     # Set the AVX compiler flag for both these choices!
 
-    GMX_TEST_CFLAG(GNU_AVX_CFLAG "-mavx" GROMACS_C_FLAGS)
+    GMX_TEST_CFLAG(GNU_AVX_CFLAG "-mavx" ACCELERATION_C_FLAGS)
     if (NOT GNU_AVX_CFLAG AND GMX_NATIVE_WINDOWS)
-        GMX_TEST_CFLAG(MSVC_AVX_CFLAG "/arch:AVX" GROMACS_C_FLAGS)
+        GMX_TEST_CFLAG(MSVC_AVX_CFLAG "/arch:AVX" ACCELERATION_C_FLAGS)
     endif (NOT GNU_AVX_CFLAG AND GMX_NATIVE_WINDOWS)
     if (NOT GNU_AVX_CFLAG AND NOT MSVC_AVX_CFLAG)
         message(WARNING "No C AVX flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
     endif (NOT GNU_AVX_CFLAG AND NOT MSVC_AVX_CFLAG)
 
     if (CMAKE_CXX_COMPILER_LOADED)
-        GMX_TEST_CXXFLAG(GNU_AVX_CXXFLAG "-mavx" GROMACS_CXX_FLAGS)
+        GMX_TEST_CXXFLAG(GNU_AVX_CXXFLAG "-mavx" ACCELERATION_CXX_FLAGS)
         if (NOT GNU_AVX_CXXFLAG AND GMX_NATIVE_WINDOWS)
-            GMX_TEST_CXXFLAG(MSVC_AVX_CXXFLAG "/arch:AVX" GROMACS_CXX_FLAGS)
+            GMX_TEST_CXXFLAG(MSVC_AVX_CXXFLAG "/arch:AVX" ACCELERATION_CXX_FLAGS)
         endif (NOT GNU_AVX_CXXFLAG AND GMX_NATIVE_WINDOWS)
         if (NOT GNU_AVX_CXXFLAG AND NOT MSVC_AVX_CXXFLAG)
             message(WARNING "No C++ AVX flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
@@ -817,24 +851,27 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
 
     # Set the FMA4 flags (MSVC doesn't require any)
     if(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" AND NOT MSVC)
-        GMX_TEST_CFLAG(GNU_FMA_CFLAG "-mfma4" GROMACS_C_FLAGS)
+        if (${CMAKE_COMPILER_ID} MATCHES "Clang")
+            message(FATAL_ERROR "Clang up to at least version 3.2 produces incorrect code for AVX_128_FMA. Sorry, but you will have to select a different compiler or acceleration.")
+        endif()
+        GMX_TEST_CFLAG(GNU_FMA_CFLAG "-mfma4" ACCELERATION_C_FLAGS)
         if (NOT GNU_FMA_CFLAG)
             message(WARNING "No C FMA4 flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
         endif(NOT GNU_FMA_CFLAG)
-        GMX_TEST_CFLAG(GNU_XOP_CFLAG "-mxop" GROMACS_C_FLAGS)
+        GMX_TEST_CFLAG(GNU_XOP_CFLAG "-mxop" ACCELERATION_C_FLAGS)
         # No big deal if we do not have xop, so no point yelling warnings about it.
         if (CMAKE_CXX_COMPILER_LOADED)
-            GMX_TEST_CXXFLAG(GNU_FMA_CXXFLAG "-mfma4" GROMACS_CXX_FLAGS)
+            GMX_TEST_CXXFLAG(GNU_FMA_CXXFLAG "-mfma4" ACCELERATION_CXX_FLAGS)
             if (NOT GNU_FMA_CXXFLAG)
                 message(WARNING "No C++ FMA flag found. Consider a newer compiler, or try SSE4.1 (lower performance).")
             endif (NOT GNU_FMA_CXXFLAG)
-            GMX_TEST_CXXFLAG(GNU_XOP_CXXFLAG "-mxop" GROMACS_CXX_FLAGS)
+            GMX_TEST_CXXFLAG(GNU_XOP_CXXFLAG "-mxop" ACCELERATION_CXX_FLAGS)
             # No big deal if we do not have xop, so no point yelling warnings about it.
         endif()
     endif()
 
     # Only test the header after we have tried to add the flag for AVX support
-    check_include_file(immintrin.h  HAVE_IMMINTRIN_H ${GROMACS_C_FLAGS})
+    check_include_file(immintrin.h  HAVE_IMMINTRIN_H ${ACCELERATION_C_FLAGS})
 
     if(NOT HAVE_IMMINTRIN_H)
         message(FATAL_ERROR "Cannot find immintrin.h, which is required for AVX intrinsics support. Consider switching compiler.")
@@ -843,15 +880,15 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
     if(${GMX_CPU_ACCELERATION} STREQUAL "AVX_256")
         try_compile(TEST_AVX ${CMAKE_BINARY_DIR}
             "${CMAKE_SOURCE_DIR}/cmake/TestAVX.c"
-            COMPILE_DEFINITIONS "${GROMACS_C_FLAGS}")
+            COMPILE_DEFINITIONS "${ACCELERATION_C_FLAGS}")
         if(NOT TEST_AVX)
             message(FATAL_ERROR "Cannot compile AVX intrinsics. Consider switching compiler.")
         endif()
     endif()
 
     # GCC requires x86intrin.h for FMA support. MSVC 2010 requires intrin.h for FMA support.
-    check_include_file(x86intrin.h HAVE_X86INTRIN_H ${GROMACS_C_FLAGS})
-    check_include_file(intrin.h HAVE_INTRIN_H ${GROMACS_C_FLAGS})
+    check_include_file(x86intrin.h HAVE_X86INTRIN_H ${ACCELERATION_C_FLAGS})
+    check_include_file(intrin.h HAVE_INTRIN_H ${ACCELERATION_C_FLAGS})
 
     # The user should not be able to set this orthogonally to the acceleration
     set(GMX_X86_SSE4_1 1)
@@ -873,29 +910,40 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
         endif()
     endif()
 
-elseif(${GMX_CPU_ACCELERATION} STREQUAL "BLUEGENE")
-# GMX_CPU_ACCELERATION=BlueGene should be set in the Toolchain-BlueGene?-???.cmake file
-    if (NOT ACCELERATION_QUIETLY)
-      message(STATUS "Configuring for BlueGene")
+    # Unfortunately gcc-4.5.2 and gcc-4.6.0 has a bug where they use the wrong datatype for the formal
+    # parameter of the mask for maskload/maskstore arguments. Check if this is present, since we can work around it.
+    gmx_test_avx_gcc_maskload_bug(${ACCELERATION_C_FLAGS} GMX_X86_AVX_GCC_MASKLOAD_BUG)
+
+else(${GMX_CPU_ACCELERATION} STREQUAL "IBM_QPX")
+    # Used on BlueGene/Q
+    if (CMAKE_C_COMPILER_ID MATCHES "XL")
+        GMX_TEST_CFLAG(XLC_BLUEGENEQ_CFLAG "-qarch=qp -qtune=qp" ACCELERATION_C_FLAGS)
+        try_compile(TEST_QPX ${CMAKE_BINARY_DIR}
+            "${CMAKE_SOURCE_DIR}/cmake/TestQPX.c"
+            COMPILE_DEFINITIONS "${ACCELERATION_C_FLAGS}")
+        if(NOT TEST_QPX)
+            message(FATAL_ERROR "Cannot compile the requested IBM QPX intrinsics.")
+        endif()
     endif()
-    set(GMX_BLUEGENE 1)
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "BlueGeneL")
-        set(SHARED_LIBS_DEFAULT OFF CACHE BOOL "Shared libraries not compatible with BlueGene/L, disabled!" FORCE)
-        set(BUILD_SHARED_LIBS OFF CACHE BOOL "Shared libraries not compatible with BlueGene/L, disabled!" FORCE)
-    endif (${CMAKE_SYSTEM_NAME} STREQUAL "BlueGeneL")
-    set(GMX_SOFTWARE_INVSQRT OFF CACHE BOOL "Do not use software reciprocal square root on BlueGene" FORCE)
-    set(GMX_X11 OFF CACHE BOOL "X11 not compatible with BlueGene, disabled!" FORCE)
-    set(GMX_THREAD_MPI OFF CACHE BOOL "Thread-MPI not compatible with BlueGene, disabled!" FORCE)
-    set(GMX_MPI ON CACHE BOOL "Use MPI on BlueGene" FORCE)
-# Access to /etc/passwd is not available on the back end of BlueGene,
-# despite being detected by CMake. This can cause linker warnings
-# about harmless things in src/gmxlib/string2.h.
-    set(HAVE_PWD_H OFF)
-# The automatic testing for endianness does not work for the BlueGene cross-compiler
-    set(GMX_IEEE754_BIG_ENDIAN_BYTE_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP byte order (by default)" FORCE)
-    set(GMX_IEEE754_BIG_ENDIAN_WORD_ORDER 1 CACHE INTERNAL "BlueGene has big endian FP word order (by default)" FORCE)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "XL" AND CMAKE_CXX_COMPILER_LOADED)
+        GMX_TEST_CXXFLAG(XLC_BLUEGENEQ_CXXFLAG "-qarch=qp -qtune=qp" ACCELERATION_CXX_FLAGS)
+        try_compile(TEST_QPX ${CMAKE_BINARY_DIR}
+            "cmake/TestQPX.c"
+            COMPILE_DEFINITIONS "${ACCELERATION_CXX_FLAGS")
+        if(NOT TEST_QPX)
+            message(FATAL_ERROR "Cannot compile the requested IBM QPX intrinsics.")
+        endif()
+    endif()
+
+    if (TEST_QPX)
+        message(WARNING "IBM QPX acceleration was selected and could be compiled, but the accelerated kernels are not yet available.")
+        set(GMX_CPU_ACCELERATION_IBM_QPX 1)
+    else()
+        message(FATAL_ERROR "Cannot compile IBM QPX intrinsics without the XL compiler. If you are compiling for BlueGene/Q, use 'cmake .. -DCMAKE_TOOLCHAIN_FILE=BlueGeneQ-static-XL-C' to set up the tool chain.")
+    endif()
+
 else(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
-    MESSAGE(FATAL_ERROR "Unrecognized option for accelerated kernels: ${GMX_CPU_ACCELERATION}. Pick one of None, SSE2, SSE4.1, AVX_128_FMA, AVX_256, BlueGene")
+    MESSAGE(FATAL_ERROR "Unrecognized option for accelerated kernels: ${GMX_CPU_ACCELERATION}. Pick one of None, SSE2, SSE4.1, AVX_128_FMA, AVX_256, IBM_QPX")
 endif(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
 set(ACCELERATION_QUIETLY TRUE CACHE INTERNAL "")
 
@@ -1066,26 +1114,29 @@ if(GMX_FAHCORE)
   set(COREWRAP_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../corewrap" CACHE STRING 
       "Path to swindirect.h")
   include_directories(${COREWRAP_INCLUDE_DIR})
+  set_property(CACHE GMX_COOL_QUOTES VALUE OFF)
 endif(GMX_FAHCORE)
 
 # # # # # # # # # # NO MORE TESTS AFTER THIS LINE! # # # # # # # # # # #
 # these are set after everything else
-if (NOT DEFINED GROMACS_C_FLAGS_SET)
-    set(GROMACS_C_FLAGS_SET true CACHE INTERNAL "Whether to reset the C flags" 
-        FORCE)
-    set(CMAKE_C_FLAGS "${GROMACS_C_FLAGS} ${CMAKE_C_FLAGS}" CACHE STRING 
-        "Flags used by the compiler during all build types" FORCE)
-    if (CMAKE_CXX_COMPILER_LOADED)
-        set(CMAKE_CXX_FLAGS "${GROMACS_CXX_FLAGS} ${CMAKE_CXX_FLAGS}" CACHE STRING 
-            "Flags used by the compiler during all build types" FORCE)
+if (NOT GMX_SKIP_DEFAULT_CFLAGS)
+    set(CMAKE_C_FLAGS "${ACCELERATION_C_FLAGS} ${MPI_COMPILE_FLAGS} ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${ACCELERATION_CXX_FLAGS} ${MPI_COMPILE_FLAGS} ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${MPI_LINKER_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${MPI_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS}")
+else()
+    message("Recommended flags which are not added because GMX_SKIP_DEFAULT_CFLAGS=yes:")
+    message("CMAKE_C_FLAGS: ${ACCELERATION_C_FLAGS} ${MPI_COMPILE_FLAGS} ${GMXC_CFLAGS}")
+    message("CMAKE_C_FLAGS_RELEASE: ${GMXC_CFLAGS_RELEASE}")
+    message("CMAKE_C_FLAGS_DEBUG: ${GMXC_CFLAGS_DEBUG}")
+    if(CMAKE_CXX_COMPILER_LOADED)
+        message("CMAKE_CXX_FLAGS: ${ACCELERATION_CXX_FLAGS} ${MPI_COMPILE_FLAGS} ${GMXC_CXXFLAGS}")
+        message("CMAKE_CXX_FLAGS_RELEASE: ${GMXC_CXXFLAGS_RELEASE}")
+        message("CMAKE_CXX_FLAGS_DEBUG: ${GMXC_CXXFLAGS_DEBUG}")
     endif()
-    set(CMAKE_EXE_LINKER_FLAGS 
-        "${GROMACS_LINKER_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}" 
-        CACHE STRING "Linker flags for creating executables" FORCE) 
-    set(CMAKE_SHARED_LINKER_FLAGS 
-        "${GROMACS_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS}" 
-        CACHE STRING "Linker flags for creating shared libraries" FORCE) 
-endif (NOT DEFINED GROMACS_C_FLAGS_SET)
+    message("CMAKE_EXE_LINKER_FLAGS: ${MPI_LINKER_FLAGS}")
+    message("CMAKE_SHARED_LINKER_FLAGS: ${MPI_LINKER_FLAGS}")
+endif()
 
 if(NOT GMX_OPENMP)
     #Unset all OpenMP flags in case OpenMP was disabled either by the user

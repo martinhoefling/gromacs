@@ -35,23 +35,25 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
-#include <gmx_ana.h>
+#include <stdio.h>
+#include <cuda.h>
+#include <cuda_runtime_api.h>
 
+#include "buildinfo.h"
 
-/* This is just a wrapper binary.
-* The code that used to be in g_dih.c is now in gmx_dih.c,
-* where the old main function is called gmx_dih().
-*/
-int
-main(int argc, char *argv[])
+extern "C" void gmx_print_version_info_gpu(FILE *fp) 
 {
-  gmx_dih(argc,argv);
-  return 0;
+    int cuda_driver,cuda_runtime;
+    fprintf(fp, "CUDA compiler:      %s\n",CUDA_NVCC_COMPILER_INFO);
+    cuda_driver = 0;
+    cudaDriverGetVersion(&cuda_driver);
+    cuda_runtime = 0;
+    cudaRuntimeGetVersion(&cuda_runtime);
+    fprintf(fp, "CUDA driver:        %d.%d\n",cuda_driver/1000, cuda_driver%100);
+    fprintf(fp, "CUDA runtime:       %d.%d\n",cuda_runtime/1000, cuda_runtime%100);
 }
-
-
-  

@@ -1283,7 +1283,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                 top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
                                 cglo_flags 
                                 | CGLO_ENERGY 
-                                | (bStopCM ? CGLO_STOPCM : 0)
                                 | (bTemp ? CGLO_TEMPERATURE:0) 
                                 | (bPres ? CGLO_PRESSURE : 0) 
                                 | (bPres ? CGLO_CONSTRAINT : 0)
@@ -1321,9 +1320,6 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                             top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
                                             CGLO_RERUNMD | CGLO_GSTAT | CGLO_TEMPERATURE);
                         }
-
-
-                        update_tcouple(fplog,step,ir,state,ekind,wcycle,upd,&MassQ,mdatoms);
                     }
                 }
                 
@@ -1372,7 +1368,10 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                 saved_conserved_quantity -= enerd->term[F_DISPCORR];
             }
             /* sum up the foreign energy and dhdl terms for vv.  currently done every step so that dhdl is correct in the .edr */
-            sum_dhdl(enerd,state->lambda,ir->fepvals);
+            if (!bRerunMD)
+            {
+                sum_dhdl(enerd,state->lambda,ir->fepvals);
+            }
         }
         
         /* ########  END FIRST UPDATE STEP  ############## */
@@ -1590,21 +1589,26 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
             gs.sig[eglsCHKPT] = 1;
         }
   
-
-        /* at the start of step, randomize the velocities */
-        if (ETC_ANDERSEN(ir->etc) && EI_VV(ir->eI))
+        /* at the start of step, randomize or scale the velocities (trotter done elsewhere) */
+        if (EI_VV(ir->eI))
         {
-            gmx_bool bDoAndersenConstr,bIfRandomize;
-            bIfRandomize = update_randomize_velocities(ir,step,mdatoms,state,upd,&top->idef,constr);
-            bDoAndersenConstr = (constr && bIfRandomize);
-            /* if we have constraints, we have to remove the kinetic energy parallel to the bonds */
-            if (bDoAndersenConstr)
+            if (!bInitStep)
             {
-                update_constraints(fplog,step,&dvdl,ir,ekind,mdatoms,
-                                   state,fr->bMolPBC,graph,f,
-                                   &top->idef,tmp_vir,NULL,
-                                   cr,nrnb,wcycle,upd,constr,
-                                   bInitStep,TRUE,bCalcVir,vetanew);
+                update_tcouple(fplog,step,ir,state,ekind,wcycle,upd,&MassQ,mdatoms);
+            }
+            if (ETC_ANDERSEN(ir->etc)) /* keep this outside of update_tcouple because of the extra info required to pass */
+            {
+                gmx_bool bIfRandomize;
+                bIfRandomize = update_randomize_velocities(ir,step,mdatoms,state,upd,&top->idef,constr);
+                /* if we have constraints, we have to remove the kinetic energy parallel to the bonds */
+                if (constr && bIfRandomize)
+                {
+                    update_constraints(fplog,step,&dvdl,ir,ekind,mdatoms,
+                                       state,fr->bMolPBC,graph,f,
+                                       &top->idef,tmp_vir,NULL,
+                                       cr,nrnb,wcycle,upd,constr,
+                                       bInitStep,TRUE,bCalcVir,vetanew);
+                }
             }
         }
 
@@ -1802,7 +1806,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
                                 lastbox,
                                 top_global,&pcurr,top_global->natoms,&bSumEkinhOld,
                                 cglo_flags 
-                                | (!EI_VV(ir->eI) ? CGLO_ENERGY : 0)
+                                | (!EI_VV(ir->eI) || bRerunMD ? CGLO_ENERGY : 0)
                                 | (!EI_VV(ir->eI) && bStopCM ? CGLO_STOPCM : 0)
                                 | (!EI_VV(ir->eI) ? CGLO_TEMPERATURE : 0) 
                                 | (!EI_VV(ir->eI) || bRerunMD ? CGLO_PRESSURE : 0) 
@@ -1835,7 +1839,7 @@ double do_md(FILE *fplog,t_commrec *cr,int nfile,const t_filenm fnm[],
 
         /* only add constraint dvdl after constraints */
         enerd->term[F_DVDL_BONDED] += dvdl;
-        if (!bVV)
+        if (!bVV || bRerunMD)
         {
             /* sum up the foreign energy and dhdl terms for md and sd. currently done every step so that dhdl is correct in the .edr */
             sum_dhdl(enerd,state->lambda,ir->fepvals);
