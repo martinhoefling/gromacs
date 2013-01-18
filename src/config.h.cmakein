@@ -44,6 +44,8 @@
 #pragma warning (disable : 4090)
 #endif
 
+#include "gmx_header_config.h"
+
 /* Name of package (translate from cmake to autoconf macro name) */
 #define PACKAGE  "@PROJECT_NAME@"
 
@@ -464,6 +466,9 @@
 #define USE_FAH_XDR  1
 #include "swindirect.h"
 #endif
+
+/* default name mangling maybe wrong on exotic plattforms */
+#define F77_FUNC(name,NAME) name ## _
 
 /* Define if we have pipes */
 #cmakedefine HAVE_PIPES

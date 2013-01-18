@@ -32,26 +32,32 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 #
-# includes: Nothing to build, just configuration and installation
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/gmx_header_config.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/gmx_header_config.h)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gmx_header_config.h
-  DESTINATION ${INCL_INSTALL_DIR}/gromacs
-  COMPONENT development
-)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/version.h)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/version.h
-  DESTINATION ${INCL_INSTALL_DIR}/gromacs
-  COMPONENT development
-)
+include_directories(${OpenMM_INCLUDE_DIR})
+link_directories(${OpenMM_LIBRARY_DIR}) 
+# with this define no evn.var. is needed with OPENMM_PLUGIN_DIR
+# if the same OpenMM installation is used for running and building 
+add_definitions( -DOPENMM_PLUGIN_DIR="${OpenMM_PLUGIN_DIR}" ) 
+file(TO_CMAKE_PATH ${OpenMM_PLUGIN_DIR} _path)
+add_library(openmm_api_wrapper STATIC openmm_wrapper.cpp)
+target_link_libraries(openmm_api_wrapper ${OpenMM_LIBRARIES})
+list(APPEND GMX_EXTRA_LIBRARIES openmm_api_wrapper ${OpenMM_LIBRARIES})   
 
+list(REMOVE_ITEM MDRUN_SOURCES mdrun.c)
+list(APPEND MDRUN_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/contrib/md_openmm.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/contrib/mdrun_openmm.c)
 
-install(DIRECTORY . DESTINATION ${INCL_INSTALL_DIR}/gromacs
-  COMPONENT development
-  PATTERN "Makefile*" EXCLUDE
-  PATTERN "CMake*" EXCLUDE
-  PATTERN "cmake*" EXCLUDE
-  PATTERN "*~" EXCLUDE
-  PATTERN "*.cmakein" EXCLUDE
-  REGEX "gmx_(arpack|blas|lapack).h$" EXCLUDE
-)
+# this is to circumvent the following MSVC error: 
+# warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs
+# fatal error LNK1169: one or more multiply defined symbols found
+if(GMX_OPENMM AND MSVC)
+    set_target_properties(mdrun PROPERTIES LINK_FLAGS "/NODEFAULTLIB:LIBCMT")
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/src/gmxlib/gpu_utils)
+
+set_source_files_properties(main.c PROPERTIES LANGUAGE CXX)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set_source_files_properties(main.c PROPERTIES COMPILE_FLAGS "-x c++")
+endif()

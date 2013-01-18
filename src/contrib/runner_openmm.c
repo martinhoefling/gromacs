@@ -83,6 +83,7 @@
 #include "../mdlib/nbnxn_consts.h"
 #include "gmx_fatal_collective.h"
 #include "membed.h"
+#include "md_openmm.h"
 #include "gmx_omp.h"
 
 #include "thread_mpi/threads.h"
@@ -106,7 +107,7 @@ typedef struct {
 } gmx_intp_t;
 
 /* The array should match the eI array in include/types/enums.h */
-const gmx_intp_t integrator[eiNR] = { {do_md}, {do_steep}, {do_cg}, {do_md}, {do_md}, {do_nm}, {do_lbfgs}, {do_tpi}, {do_tpi}, {do_md}, {do_md},{do_md}};
+const gmx_intp_t integrator[eiNR] = { {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm}, {do_md_openmm},{do_md_openmm}};
 
 gmx_large_int_t     deform_init_init_step_tpx;
 matrix              deform_init_box_tpx;
@@ -148,8 +149,6 @@ struct mdrunner_arglist
     real cpt_period;
     real max_hours;
     const char *deviceOptions;
-    int imdport;
-    int imdfreq;
     unsigned long Flags;
     int ret; /* return value */
 };
@@ -186,8 +185,7 @@ static void mdrunner_start_fn(void *arg)
                       mc.nbpu_opt,
                       mc.nsteps_cmdline, mc.nstepout, mc.resetstep,
                       mc.nmultisim, mc.repl_ex_nst, mc.repl_ex_nex, mc.repl_ex_seed, mc.pforce, 
-                      mc.cpt_period, mc.max_hours, mc.deviceOptions,
-                      mc.imdport, mc.imdfreq, mc.Flags);
+                      mc.cpt_period, mc.max_hours, mc.deviceOptions, mc.Flags);
 }
 
 /* called by mdrunner() to start a specific number of threads (including 
@@ -1073,10 +1071,9 @@ static void set_cpu_affinity(FILE *fplog,
 
 
 static void check_and_update_hw_opt(gmx_hw_opt_t *hw_opt,
-                                    int cutoff_scheme,
-                                    gmx_bool bIsSimMaster)
+                                    int cutoff_scheme)
 {
-    gmx_omp_nthreads_read_env(&hw_opt->nthreads_omp, bIsSimMaster);
+    gmx_omp_nthreads_read_env(&hw_opt->nthreads_omp);
 
 #ifndef GMX_THREAD_MPI
     if (hw_opt->nthreads_tot > 0)
@@ -1226,7 +1223,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
              int nsteps_cmdline, int nstepout,int resetstep,
              int nmultisim,int repl_ex_nst,int repl_ex_nex,
              int repl_ex_seed, real pforce,real cpt_period,real max_hours,
-             const char *deviceOptions, int imdport, int imdfreq, unsigned long Flags)
+             const char *deviceOptions, unsigned long Flags)
 {
     gmx_bool   bForceUseGPU,bTryUseGPU;
     double     nodetime=0,realtime;
@@ -1337,7 +1334,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     if (SIMMASTER(cr))
 #endif
     {
-        check_and_update_hw_opt(hw_opt,minf.cutoff_scheme,SIMMASTER(cr));
+        check_and_update_hw_opt(hw_opt,minf.cutoff_scheme);
 
 #ifdef GMX_THREAD_MPI
         /* Early check for externally set process affinity. Can't do over all
@@ -1459,6 +1456,13 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     /* now make sure the state is initialized and propagated */
     set_state_entries(state,inputrec,cr->nnodes);
 
+    /* remove when vv and rerun works correctly! */
+    if (PAR(cr) && EI_VV(inputrec->eI) && ((Flags & MD_RERUN) || (Flags & MD_RERUN_VSITE)))
+    {
+        gmx_fatal(FARGS,
+                  "Currently can't do velocity verlet with rerun in parallel.");
+    }
+
     /* A parallel command line option consistency check that we can
        only do after any threads have started. */
     if (!PAR(cr) &&
@@ -1524,7 +1528,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     snew(fcd,1);
 
     /* This needs to be called before read_checkpoint to extend the state */
-    init_disres(fplog,mtop,inputrec,cr,Flags & MD_PARTDEC,fcd,state, repl_ex_nst > 0);
+    init_disres(fplog,mtop,inputrec,cr,Flags & MD_PARTDEC,fcd,state);
 
     if (gmx_mtop_ftype_count(mtop,F_ORIRES) > 0)
     {
@@ -1621,7 +1625,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     if (opt2bSet("-ei",nfile,fnm))
     {
         /* Open input and output files, allocate space for ED data structure */
-        ed = ed_open(mtop->natoms,&state->edsamstate,nfile,fnm,Flags,oenv,cr);
+        ed = ed_open(nfile,fnm,Flags,cr);
     }
 
     if (PAR(cr) && !((Flags & MD_PARTDEC) ||
@@ -1842,7 +1846,10 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     }
 
 
-    if (integrator[inputrec->eI].func == do_md)
+    if (integrator[inputrec->eI].func == do_md
+        ||
+        integrator[inputrec->eI].func == do_md_openmm
+        )
     {
         /* Turn on signal handling on all nodes */
         /*
@@ -1892,7 +1899,6 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
                                       membed,
                                       cpt_period,max_hours,
                                       deviceOptions,
-                                      imdport,imdfreq,
                                       Flags,
                                       &runtime);
 
