@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -52,8 +52,8 @@ typedef enum module_nth
     emntNR
 } module_nth_t;
 
-/*! Initializes the per-module thread count. It is compatible with tMPI, 
- *  thread-safety is ensured (for the features available with tMPI). 
+/*! Initializes the per-module thread count. It is compatible with tMPI,
+ *  thread-safety is ensured (for the features available with tMPI).
  *  This function should caled only once during the initialization of mdrun. */
 GMX_LIBGMX_EXPORT
 void gmx_omp_nthreads_init(FILE *fplog, t_commrec *cr,
@@ -69,7 +69,7 @@ int gmx_omp_nthreads_get(int mod);
 
 /*! Read the OMP_NUM_THREADS env. var. and check against the value set on the command line. */
 GMX_LIBGMX_EXPORT
-void gmx_omp_nthreads_read_env(int *nthreads_omp,
+void gmx_omp_nthreads_read_env(int     *nthreads_omp,
                                gmx_bool bIsSimMaster);
 
 #endif /* GMX_OMP_NTHREADS */

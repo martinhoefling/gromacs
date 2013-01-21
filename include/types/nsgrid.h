@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -47,31 +47,31 @@ extern "C" {
 
 
 typedef struct {
-  int	 nr;		/* Total number of charge groups	*/
-  int    nboundeddim;   /* The number of bounded dimensions     */
-  int    npbcdim;       /* The number of dimensions with pbc    */
-  int    ncg_ideal;     /* The ideal number of cg's per cell    */
-  ivec	 n;	        /* The dimension of the grid		*/
-  int    ncells;	/* Total number of cells		*/
-  int    cells_nalloc;	/* Allocation size of index and nra    	*/
-  ivec   ncpddc;        /* The number of cells per DD cell      */
-  rvec   cell_size;     /* The size of the cells                */
-  rvec   cell_offset;   /* The offset of the cell (0,0,0)       */
-  int	 *cell_index;	/* The cell number of each cg		*/
-  int    *index;	/* The index into a for each cell	*/
-			/* The location of the cell in the index*/
-			/* array can be found by calling xyz2ci	*/
-  int    *nra;		/* The number of entries in a cell	*/
-  int    icg0;          /* The start of the i-cg range          */
-  int    icg1;          /* The end of the i-cg range            */
-  rvec   *os0;
-  rvec   *os1;
-  int    *a;		/* The grid of cgs			*/
-  int    nr_alloc;      /* Allocation size of cell_index and a  */
-  real   *dcx2;         /* Squared distance from atom to j-cell */
-  real   *dcy2;         /* Squared distance from atom to j-cell */
-  real   *dcz2;         /* Squared distance from atom to j-cell */
-  int    dc_nalloc;     /* Allocation size of dcx2, dyc2, dcz2  */
+    int     nr;           /* Total number of charge groups	*/
+    int     nboundeddim;  /* The number of bounded dimensions     */
+    int     npbcdim;      /* The number of dimensions with pbc    */
+    int     ncg_ideal;    /* The ideal number of cg's per cell    */
+    ivec    n;            /* The dimension of the grid		*/
+    int     ncells;       /* Total number of cells		*/
+    int     cells_nalloc; /* Allocation size of index and nra       */
+    ivec    ncpddc;       /* The number of cells per DD cell      */
+    rvec    cell_size;    /* The size of the cells                */
+    rvec    cell_offset;  /* The offset of the cell (0,0,0)       */
+    int    *cell_index;   /* The cell number of each cg		*/
+    int    *index;        /* The index into a for each cell	*/
+    /* The location of the cell in the index*/
+    /* array can be found by calling xyz2ci	*/
+    int    *nra;    /* The number of entries in a cell	*/
+    int     icg0;   /* The start of the i-cg range          */
+    int     icg1;   /* The end of the i-cg range            */
+    rvec   *os0;
+    rvec   *os1;
+    int    *a;         /* The grid of cgs			*/
+    int     nr_alloc;  /* Allocation size of cell_index and a  */
+    real   *dcx2;      /* Squared distance from atom to j-cell */
+    real   *dcy2;      /* Squared distance from atom to j-cell */
+    real   *dcz2;      /* Squared distance from atom to j-cell */
+    int     dc_nalloc; /* Allocation size of dcx2, dyc2, dcz2  */
 } t_grid;
 
 #ifdef __cplusplus

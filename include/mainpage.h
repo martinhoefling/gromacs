@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -42,15 +42,13 @@
 
 /*! \mainpage Gromacs
 
-  GROMACS is a versatile package to perform molecular dynamics, i.e.  simulate 
-  the Newtonian equations of motion for systems with hundreds, to millions 
-  of particles.
+   GROMACS is a versatile package to perform molecular dynamics, i.e.  simulate
+   the Newtonian equations of motion for systems with hundreds, to millions
+   of particles.
 
-  Currently, there is documentation available (at least) on the following
-  parts of the source tree:
+   Currently, there is documentation available (at least) on the following
+   parts of the source tree:
    - \subpage thread_mpi
    - \subpage libtrajana
 
-  */
-
-
+ */

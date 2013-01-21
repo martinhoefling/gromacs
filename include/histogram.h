@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2009, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -76,7 +76,7 @@ typedef enum
      *
      * Use gmx_histogram_add_item() or gmx_histogram_add_item_to_bin() to sample.
      */
-    HIST_BINAVER 
+    HIST_BINAVER
 } e_histogram_t;
 
 /** Whether bins are centered at integer values. */
@@ -209,7 +209,7 @@ gmx_histogram_write(FILE *fp, gmx_histogram_t *h, gmx_bool bErrors);
 /** Writes a set of histograms to a file. */
 void
 gmx_histogram_write_array(FILE *fp, int n, gmx_histogram_t *h[],
-                              gmx_bool bValue, gmx_bool bErrors);
+                          gmx_bool bValue, gmx_bool bErrors);
 /** Writes a set of cumulative histograms to a file. */
 void
 gmx_histogram_write_cum_array(FILE *fp, int n, gmx_histogram_t *h[],

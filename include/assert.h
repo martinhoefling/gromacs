@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -51,16 +51,16 @@ extern "C" {
 #endif
 
 #define assert(EXPRESSION)  \
-  if (!(EXPRESSION)) { \
-    fprintf(stderr,"Assertion failed for \"%s\" in file %s, " \
-	    "line %d\ndump core ? (y/n):",#EXPRESSION, __FILE__, __LINE__); \
-    fflush(stderr); \
-    if (toupper(getc(stdin))=='Y') \
-      (void) abort(); else exit(-1); \
-  }
+    if (!(EXPRESSION)) { \
+        fprintf(stderr, "Assertion failed for \"%s\" in file %s, " \
+                "line %d\ndump core ? (y/n):",#EXPRESSION, __FILE__, __LINE__); \
+        fflush(stderr); \
+        if (toupper(getc(stdin)) == 'Y') { \
+            (void) abort(); } else{ exit(-1); } \
+    }
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _assert_h */
+#endif  /* _assert_h */

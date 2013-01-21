@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -46,26 +46,26 @@ extern "C" {
 #endif
 
 GMX_LIBGMX_EXPORT
-void randwater(int astart,int nwater,int nwatom,
-		      rvec x[],rvec v[],int *seed);
+void randwater(int astart, int nwater, int nwatom,
+               rvec x[], rvec v[], int *seed);
 /* Randomize the order of nwater molecules of length nwatom, the
  * first atom of which is at astart.
  * If v is not NULL it will be shuffled along
- * IS NOT THREAD SAFE 
+ * IS NOT THREAD SAFE
  */
 
 
 GMX_LIBGMX_EXPORT
-void sortwater(int astart,int nwater,int nwatom,rvec x[],rvec v[]);
+void sortwater(int astart, int nwater, int nwatom, rvec x[], rvec v[]);
 /* Sort the order of nwater molecules of length nwatom on X coordinate
  * If v is not NULL it will be shuffled along
- * IS NOT THREAD SAFE 
+ * IS NOT THREAD SAFE
  */
 
 GMX_LIBGMX_EXPORT
-void mkcompact(int astart,int nwater,int nwatom,rvec x[],rvec v[],
-		      int nnode,matrix box);
-/* Make compact subboxes 
+void mkcompact(int astart, int nwater, int nwatom, rvec x[], rvec v[],
+               int nnode, matrix box);
+/* Make compact subboxes
  * IS NOT THREAD SAFE  */
 
 #ifdef __cplusplus

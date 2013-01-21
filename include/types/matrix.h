@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -43,26 +43,26 @@ extern "C" {
 #include "simple.h"
 
 typedef struct {
-  real r,g,b;
+    real r, g, b;
 } t_rgb;
 
 typedef struct {
-  char c1; /* should all be non-zero (and printable and not '"') */
-  char c2; /* 
-	    * should all be zero (single char color names: smaller xpm's) 
-	    * or should all be non-zero (double char color names: more colors)
-	    */
+    char c1; /* should all be non-zero (and printable and not '"') */
+    char c2; /*
+              * should all be zero (single char color names: smaller xpm's)
+              * or should all be non-zero (double char color names: more colors)
+              */
 } t_xpmelmt;
 
 typedef short t_matelmt;
 
 typedef struct {
-  t_xpmelmt code; /* see comment for t_xpmelmt */
-  const char *desc;
-  t_rgb rgb;
+    t_xpmelmt   code; /* see comment for t_xpmelmt */
+    const char *desc;
+    t_rgb       rgb;
 } t_mapping;
 
-#define MAT_SPATIAL_X (1<<0)			    
+#define MAT_SPATIAL_X (1<<0)
 #define MAT_SPATIAL_Y (1<<1)
 /* Defines if x and y are spatial dimensions,
  * when not, there are n axis ticks at the middle of the elements,
@@ -70,32 +70,31 @@ typedef struct {
  */
 
 typedef struct {
-  unsigned int flags; /* The possible flags are defined above */
-  int  nx,ny;
-  int  y0;
-  char title[256];
-  char legend[256];
-  char label_x[256];
-  char label_y[256];
-  gmx_bool bDiscrete;
-  real *axis_x;
-  real *axis_y;
-  t_matelmt **matrix;
-  int nmap;
-  t_mapping *map;
+    unsigned int flags; /* The possible flags are defined above */
+    int          nx, ny;
+    int          y0;
+    char         title[256];
+    char         legend[256];
+    char         label_x[256];
+    char         label_y[256];
+    gmx_bool     bDiscrete;
+    real        *axis_x;
+    real        *axis_y;
+    t_matelmt  **matrix;
+    int          nmap;
+    t_mapping   *map;
 } t_matrix;
-  /* title      matrix title
-   * legend     label for the continuous legend
-   * label_x    label for the x-axis
-   * label_y    label for the y-axis
-   * nx, ny     size of the matrix
-   * axis_x[]   the x-ticklabels
-   * axis_y[]   the y-ticklables
-   * *matrix[]  element x,y is matrix[x][y]
-   * nmap       number of color levels for the output(?)
-   */
+/* title      matrix title
+ * legend     label for the continuous legend
+ * label_x    label for the x-axis
+ * label_y    label for the y-axis
+ * nx, ny     size of the matrix
+ * axis_x[]   the x-ticklabels
+ * axis_y[]   the y-ticklables
+ * *matrix[]  element x,y is matrix[x][y]
+ * nmap       number of color levels for the output(?)
+ */
 
 #ifdef __cplusplus
 }
 #endif
-

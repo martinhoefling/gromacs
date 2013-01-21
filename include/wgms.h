@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -47,14 +47,14 @@
 extern "C" {
 #endif
 
-void write_gms(FILE *fp,int natoms,rvec x[],matrix box);
-/* Write a gromos-87 trajectory frame (10f8.3) + box size 
+void write_gms(FILE *fp, int natoms, rvec x[], matrix box);
+/* Write a gromos-87 trajectory frame (10f8.3) + box size
  * If box == NULL it is not written
  */
 
 GMX_LIBGMX_EXPORT
-void write_gms_ndx(FILE *fp,int isize,atom_id index[],
-			  rvec x[],matrix box);
+void write_gms_ndx(FILE *fp, int isize, atom_id index[],
+                   rvec x[], matrix box);
 /* Write a gromos-87 trajectory frame (10f8.3) + box size for
  * a subset of the atoms.
  * If box == NULL it is not written

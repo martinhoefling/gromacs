@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -49,7 +49,7 @@ extern "C" {
 
 #define eNR_NBKERNEL_NONE -1
 
-enum 
+enum
 {
     eNR_NBKERNEL_VDW_VF,
     eNR_NBKERNEL_VDW_F,
@@ -74,7 +74,7 @@ enum
     eNR_NBKERNEL_ELEC_VDW_W4W4_VF,
     eNR_NBKERNEL_ELEC_VDW_W4W4_F,
 
-    eNR_NBKERNEL_NR,  /* Total number of interaction-specific kernel entries */
+    eNR_NBKERNEL_NR,                        /* Total number of interaction-specific kernel entries */
 
     eNR_NBKERNEL_GENERIC = eNR_NBKERNEL_NR, /* Reuse number; KERNEL_NR is not an entry itself */
     eNR_NBKERNEL_FREE_ENERGY,               /* Add other generic kernels _before_ the free energy one */
@@ -97,7 +97,7 @@ enum
     eNR_BORN_AVA_CHAINRULE,
     eNR_WEIGHTS,              eNR_SPREADQ,              eNR_SPREADQBSP,
     eNR_GATHERF,              eNR_GATHERFBSP,           eNR_FFT,
-    eNR_CONV,                 eNR_SOLVEPME,eNR_NS,      eNR_RESETX,
+    eNR_CONV,                 eNR_SOLVEPME, eNR_NS,      eNR_RESETX,
     eNR_SHIFTX,               eNR_CGCM,                 eNR_FSUM,
     eNR_BONDS,                eNR_G96BONDS,             eNR_FENEBONDS,
     eNR_TABBONDS,             eNR_RESTRBONDS,           eNR_LINEAR_ANGLES,

@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2008, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -38,23 +38,23 @@
 
 #ifndef _gmx_matrix_h
 #define _gmx_matrix_h
-	
+
 #include <stdio.h>
 #include "visibility.h"
-	
-double **alloc_matrix(int n,int m);
+
+double **alloc_matrix(int n, int m);
 
 GMX_LIBGMX_EXPORT
-void free_matrix(double **a,int n);
+void free_matrix(double **a, int n);
 
-void matrix_multiply(FILE *fp,int n,int m,double **x,double **y,double **z);
+void matrix_multiply(FILE *fp, int n, int m, double **x, double **y, double **z);
 
 /* Return 0 if OK or row number where inversion failed otherwise. */
-int matrix_invert(FILE *fp,int n,double **a);
+int matrix_invert(FILE *fp, int n, double **a);
 
 GMX_LIBGMX_EXPORT
-double multi_regression(FILE *fp,int ny,double *y,
-                               int nx,double **xx,double *a0);
+double multi_regression(FILE *fp, int ny, double *y,
+                        int nx, double **xx, double *a0);
 /* Perform a regression analysis to fit
  * y' = a0[0] xx[0] + a0[1] xx[1] ... + a0[nx-1] xx[nx-1]
  * with ny data points in each vector.

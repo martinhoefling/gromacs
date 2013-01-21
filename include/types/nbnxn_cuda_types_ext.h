@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -58,13 +58,13 @@ struct nbnxn_cuda_ktime
 {
     double  t;
     int     c;
-}; 
+};
 
 /* GPU timings for kernels and H2d/D2H transfers. */
 struct wallclock_gpu
 {
-    nbnxn_cuda_ktime_t ktime[2][2]; /* table containing the timings of the four 
-                                       version of the nonbonded kernels: force-only, 
+    nbnxn_cuda_ktime_t ktime[2][2]; /* table containing the timings of the four
+                                       version of the nonbonded kernels: force-only,
                                        force+energy, force+pruning, and force+energy+pruning */
     double  nb_h2d_t;               /* host to device transfer time in nb calculation  */
     double  nb_d2h_t;               /* device to host transfer time in nb calculation */

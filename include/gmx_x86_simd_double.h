@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -62,22 +62,22 @@
 static inline __m128d
 gmx_mm_calc_rsq_pd(__m128d dx, __m128d dy, __m128d dz)
 {
-    return _mm_add_pd( _mm_add_pd( _mm_mul_pd(dx,dx), _mm_mul_pd(dy,dy) ), _mm_mul_pd(dz,dz) );
+    return _mm_add_pd( _mm_add_pd( _mm_mul_pd(dx, dx), _mm_mul_pd(dy, dy) ), _mm_mul_pd(dz, dz) );
 }
 
 /* Normal sum of four __m128d registers */
-#define gmx_mm_sum4_pd(t0,t1,t2,t3)  _mm_add_pd(_mm_add_pd(t0,t1),_mm_add_pd(t2,t3))
+#define gmx_mm_sum4_pd(t0, t1, t2, t3)  _mm_add_pd(_mm_add_pd(t0, t1), _mm_add_pd(t2, t3))
 
 #ifdef GMX_X86_AVX_256
 
 static inline __m256d
 gmx_mm256_calc_rsq_pd(__m256d dx, __m256d dy, __m256d dz)
 {
-    return _mm256_add_pd( _mm256_add_pd( _mm256_mul_pd(dx,dx), _mm256_mul_pd(dy,dy) ), _mm256_mul_pd(dz,dz) );
+    return _mm256_add_pd( _mm256_add_pd( _mm256_mul_pd(dx, dx), _mm256_mul_pd(dy, dy) ), _mm256_mul_pd(dz, dz) );
 }
 
 /* Normal sum of four xmm registers */
-#define gmx_mm256_sum4_pd(t0,t1,t2,t3)  _mm256_add_pd(_mm256_add_pd(t0,t1),_mm256_add_pd(t2,t3))
+#define gmx_mm256_sum4_pd(t0, t1, t2, t3)  _mm256_add_pd(_mm256_add_pd(t0, t1), _mm256_add_pd(t2, t3))
 
 #endif
 

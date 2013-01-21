@@ -5,7 +5,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2008, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -40,58 +40,60 @@
 #ifndef _gmxcpp_h
 #define _gmxcpp_h
 #include "visibility.h"
-typedef struct gmx_cpp *gmx_cpp_t; 
-	
-	/* The possible return codes for these functions */
-enum { eCPP_OK, eCPP_FILE_NOT_FOUND, eCPP_EOF, eCPP_SYNTAX, eCPP_INTERRUPT,
-       eCPP_INVALID_HANDLE,
-       eCPP_FILE_NOT_OPEN, eCPP_UNKNOWN, eCPP_NR };
+typedef struct gmx_cpp *gmx_cpp_t;
+
+/* The possible return codes for these functions */
+enum {
+    eCPP_OK, eCPP_FILE_NOT_FOUND, eCPP_EOF, eCPP_SYNTAX, eCPP_INTERRUPT,
+    eCPP_INVALID_HANDLE,
+    eCPP_FILE_NOT_OPEN, eCPP_UNKNOWN, eCPP_NR
+};
 
 /* THESE FUNCTIONS ARE NOT THREAD SAFE!! */
 
 /* Open the file to be processed. The handle variable holds internal
    info for the cpp emulator. The cppopt variable (null terminated)
-   can hold cpp options like -IXXX and -DXXX. Return integer status. 
-   
-   NOT THREAD SAFE 
-   */
+   can hold cpp options like -IXXX and -DXXX. Return integer status.
+
+   NOT THREAD SAFE
+ */
 GMX_LIBGMX_EXPORT
-int cpp_open_file(const char *filenm,gmx_cpp_t *handlep, char **cppopts);
+int cpp_open_file(const char *filenm, gmx_cpp_t *handlep, char **cppopts);
 
 /* Return one whole line from the file into buf which holds at most n
-   characters, for subsequent processing. Returns integer status. 
-   
-   NOT THREAD SAFE 
-   */
-GMX_LIBGMX_EXPORT
-int cpp_read_line(gmx_cpp_t *handlep,int n,char buf[]);
+   characters, for subsequent processing. Returns integer status.
 
-/* Return the file currently being read. 
-   
-   NOT THREAD SAFE 
-   */
+   NOT THREAD SAFE
+ */
+GMX_LIBGMX_EXPORT
+int cpp_read_line(gmx_cpp_t *handlep, int n, char buf[]);
+
+/* Return the file currently being read.
+
+   NOT THREAD SAFE
+ */
 GMX_LIBGMX_EXPORT
 char *cpp_cur_file(const gmx_cpp_t *handlep);
 
-/* Return the current line number. 
-   
-   NOT THREAD SAFE 
-   */
+/* Return the current line number.
+
+   NOT THREAD SAFE
+ */
 GMX_LIBGMX_EXPORT
 int cpp_cur_linenr(const gmx_cpp_t *handlep);
 
-/* Close the file! Return integer status. 
-   
-   NOT THREAD SAFE 
-   */
+/* Close the file! Return integer status.
+
+   NOT THREAD SAFE
+ */
 GMX_LIBGMX_EXPORT
 int cpp_close_file(gmx_cpp_t *handlep);
 
 /* Return a string containing the error message coresponding to status
-   variable. 
-   
-   NOT THREAD SAFE 
-   */
+   variable.
+
+   NOT THREAD SAFE
+ */
 GMX_LIBGMX_EXPORT
-char *cpp_error(gmx_cpp_t *handlep,int status);
+char *cpp_error(gmx_cpp_t *handlep, int status);
 #endif

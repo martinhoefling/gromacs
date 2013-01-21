@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -61,12 +61,12 @@ extern "C" {
 #endif
 
 
-/* THESE 3 FUNCTIONS (xdropen, xdrclose and xdr_get_fp) ARE NOW OBSOLETE 
-   AND ONLY PROVIDED FOR BACKWARD COMPATIBILITY OF 3D PARTY TOOLS. 
-   THEY SHOULD NOT BE USED ANYWHERE IN GROMACS ITSELF. 
-int xdropen(XDR *xdrs, const char *filename, const char *type);
-int xdrclose(XDR *xdrs);
-*/
+/* THESE 3 FUNCTIONS (xdropen, xdrclose and xdr_get_fp) ARE NOW OBSOLETE
+   AND ONLY PROVIDED FOR BACKWARD COMPATIBILITY OF 3D PARTY TOOLS.
+   THEY SHOULD NOT BE USED ANYWHERE IN GROMACS ITSELF.
+   int xdropen(XDR *xdrs, const char *filename, const char *type);
+   int xdrclose(XDR *xdrs);
+ */
 
 /* the xdr data types; note that there is no data type 'real' because
    here we deal with the types as they are actually written to disk.  */
@@ -89,14 +89,14 @@ int xdr3dfcoord(XDR *xdrs, float *fp, int *size, float *precision);
 
 
 /* Read or write a *real* value (stored as float) */
-int xdr_real(XDR *xdrs,real *r); 
+int xdr_real(XDR *xdrs, real *r);
 
 
 /* Read or write reduced precision *real* coordinates */
-int xdr3drcoord(XDR *xdrs,real *fp,int *size,real *precision);
+int xdr3drcoord(XDR *xdrs, real *fp, int *size, real *precision);
 
 
-int xdr_gmx_large_int(XDR *xdrs,gmx_large_int_t *i,const char *warn);
+int xdr_gmx_large_int(XDR *xdrs, gmx_large_int_t *i, const char *warn);
 /* Read or write a gmx_large_int_t value.
  * 32bit code reading a 64bit gmx_large_int_t value from xdrs could
  * lead to values out of int range.
@@ -106,7 +106,7 @@ int xdr_gmx_large_int(XDR *xdrs,gmx_large_int_t *i,const char *warn);
  * "WARNING during %s:", where warn is printed in %s.
  */
 
-int xdr_xtc_seek_time(real time, FILE *fp, XDR *xdrs, int natoms,gmx_bool bSeekForwardOnly);
+int xdr_xtc_seek_time(real time, FILE *fp, XDR *xdrs, int natoms, gmx_bool bSeekForwardOnly);
 
 
 int xdr_xtc_seek_frame(int frame, FILE *fp, XDR *xdrs, int natoms);
@@ -123,5 +123,3 @@ int xdr_xtc_get_last_frame_number(FILE *fp, XDR *xdrs, int natoms, gmx_bool * bO
 #endif
 
 #endif
-
-

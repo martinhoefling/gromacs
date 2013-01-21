@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2009, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -54,7 +54,7 @@ extern "C"
 /** Defines the value type of a different selection objects. */
 typedef enum
 {
-    NO_VALUE,           /**< No value; either an error condition or an gmx_boolean 
+    NO_VALUE,           /**< No value; either an error condition or an gmx_boolean
                              parameter. */
     INT_VALUE,          /**< One or more integer values. */
     REAL_VALUE,         /**< One or more real values. */
@@ -88,17 +88,17 @@ typedef struct gmx_ana_selvalue_t
          *
          * Needs to be the first member to be able to use initialized arrays.
          */
-        void                   *ptr;
+        void                       *ptr;
         /** Integer value(s) (type \ref INT_VALUE). */
-        int                    *i;
+        int                        *i;
         /** Real value(s) (type \ref REAL_VALUE). */
-        real                   *r;
+        real                       *r;
         /** String value(s) (type \ref STR_VALUE). */
-        char                  **s;
+        char                      **s;
         /** Structure for the position value(s) (type \ref POS_VALUE). */
-        struct gmx_ana_pos_t   *p;
+        struct gmx_ana_pos_t       *p;
         /** Group value (type \ref GROUP_VALUE). */
-        struct gmx_ana_index_t *g;
+        struct gmx_ana_index_t     *g;
         /** Boolean value (only parameters of type \ref NO_VALUE); */
         gmx_bool                   *b;
     }                           u;

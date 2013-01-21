@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -146,7 +146,7 @@ gmx_cpuid_acceleration_string[GMX_CPUID_NACCELERATIONS];
 
 /* Abstract data type with CPU detection information. Set by gmx_cpuid_init(). */
 typedef struct gmx_cpuid *
-gmx_cpuid_t;
+    gmx_cpuid_t;
 
 
 /* Fill the data structure by using CPU detection instructions.
@@ -195,7 +195,7 @@ gmx_cpuid_feature           (gmx_cpuid_t                cpuid,
 
 
 /* Return pointers to cpu topology information.
- * 
+ *
  * Important: CPU topology requires more OS support than most other
  * functions in this file, including support for thread pinning to hardware.
  * This means it will not work on some platforms, including e.g. Mac OS X.

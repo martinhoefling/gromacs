@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2009, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -205,12 +205,12 @@ gmx_ana_indexgrps_set(gmx_ana_indexgrps_t **g, int ngrps, int *isize,
                       atom_id **index, char **name, gmx_bool bFree);
 /** Reads index groups from a file or constructs them from topology. */
 void
-gmx_ana_indexgrps_init(gmx_ana_indexgrps_t **g, t_topology *top, 
+gmx_ana_indexgrps_init(gmx_ana_indexgrps_t **g, t_topology *top,
                        const char *fnm);
-/** Ask user to select index groups, possibly constructing groups from 
+/** Ask user to select index groups, possibly constructing groups from
  *  topology. */
 void
-gmx_ana_indexgrps_get(gmx_ana_indexgrps_t **g, t_topology *top, 
+gmx_ana_indexgrps_get(gmx_ana_indexgrps_t **g, t_topology *top,
                       const char *fnm, int ngrps);
 /** Ask user to select index groups from those specified in a file. */
 void

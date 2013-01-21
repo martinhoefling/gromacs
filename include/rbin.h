@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -46,11 +46,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	
+
 typedef struct {
-  int    nreal;
-  int    maxreal;
-  double *rbuf;
+    int     nreal;
+    int     maxreal;
+    double *rbuf;
 } t_bin;
 
 GMX_LIBGMX_EXPORT
@@ -66,23 +66,23 @@ void reset_bin(t_bin *b);
 /* Reset number of entries to zero */
 
 GMX_LIBGMX_EXPORT
-int add_binr(t_bin *b,int nr,real r[]);
+int add_binr(t_bin *b, int nr, real r[]);
 GMX_LIBGMX_EXPORT
-int add_bind(t_bin *b,int nr,double r[]);
+int add_bind(t_bin *b, int nr, double r[]);
 /* Add reals to the bin. Returns index */
 
 GMX_LIBGMX_EXPORT
-void sum_bin(t_bin *b,t_commrec *cr);
+void sum_bin(t_bin *b, t_commrec *cr);
 /* Globally sum the reals in the bin */
 
 GMX_LIBGMX_EXPORT
-void extract_binr(t_bin *b,int index,int nr,real r[]);
+void extract_binr(t_bin *b, int index, int nr, real r[]);
 GMX_LIBGMX_EXPORT
-void extract_bind(t_bin *b,int index,int nr,double r[]);
+void extract_bind(t_bin *b, int index, int nr, double r[]);
 /* Extract values from the bin, starting from index (see add_bin) */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _rbin_h */
+#endif  /* _rbin_h */

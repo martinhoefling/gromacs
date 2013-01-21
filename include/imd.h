@@ -18,7 +18,7 @@
 #endif
 
 /* Put this before all Gromacs/IMD-related output */
-const static char IMDstr[] = "IMD:";
+static const char IMDstr[] = "IMD:";
 
 #include <limits.h>
 
@@ -29,6 +29,7 @@ const static char IMDstr[] = "IMD:";
 #include "types/commrec.h"
 #include "oenv.h"
 #include "filenm.h"
+#include "names.h"
 
 /*We define int32 which is the 32bit integer used in the IMD functions.*/
 #if ( INT_MAX == 2147483647 )
@@ -60,7 +61,6 @@ typedef enum IMDType_t
 
 /*Macros to access names for the IMDMessageType*/
 #define UNDEFINED       "UNDEFINED"
-#define ENUM_NAME(e,max,names)  ((((e)<0)||((e)>=(max)))?UNDEFINED:(names)[e])
 
 /*Energy record as in the original IMD implementation, energys in Kcal/mol*/
 /*NOTE: We return the energies in GROMACS / SI units, so they also show up as SI in VMD.*/

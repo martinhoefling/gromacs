@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -79,20 +79,20 @@ gmx_nonbonded_set_kernel_pointers(FILE *       fplog,
 
 GMX_LIBGMX_EXPORT
 void
-do_nonbonded(t_commrec *cr,t_forcerec *fr,
-             rvec x[],rvec f_shortrange[],rvec f_longrange[],t_mdatoms *md,t_blocka *excl,
-             gmx_grppairener_t *grppener,rvec box_size,
-             t_nrnb *nrnb,real *lambda,real dvdlambda[],
-             int nls,int eNL,int flags);
+do_nonbonded(t_commrec *cr, t_forcerec *fr,
+             rvec x[], rvec f_shortrange[], rvec f_longrange[], t_mdatoms *md, t_blocka *excl,
+             gmx_grppairener_t *grppener, rvec box_size,
+             t_nrnb *nrnb, real *lambda, real dvdlambda[],
+             int nls, int eNL, int flags);
 
 /* Calculate VdW/charge listed pair interactions (usually 1-4 interactions).
  * global_atom_index is only passed for printing error messages.
  */
 real
-do_nonbonded_listed(int ftype,int nbonds,const t_iatom iatoms[],const t_iparams iparams[],
-                    const rvec x[],rvec f[],rvec fshift[],const t_pbc *pbc,const t_graph *g,
-                    real *lambda, real *dvdl,const t_mdatoms *md,const t_forcerec *fr,
-                    gmx_grppairener_t *grppener,int *global_atom_index);
+do_nonbonded_listed(int ftype, int nbonds, const t_iatom iatoms[], const t_iparams iparams[],
+                    const rvec x[], rvec f[], rvec fshift[], const t_pbc *pbc, const t_graph *g,
+                    real *lambda, real *dvdl, const t_mdatoms *md, const t_forcerec *fr,
+                    gmx_grppairener_t *grppener, int *global_atom_index);
 
 #ifdef __cplusplus
 }

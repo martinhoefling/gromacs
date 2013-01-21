@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -50,29 +50,29 @@ extern "C" {
 #endif
 
 typedef struct {
-    gmx_bool       bGStatEveryStep;
+    gmx_bool        bGStatEveryStep;
     gmx_large_int_t step_ns;
     gmx_large_int_t step_nscheck;
     gmx_large_int_t nns;
-    matrix     scale_tot;
-    int        nabnsb;
-    double     s1;
-    double     s2;
-    double     ab;
-    double     lt_runav;
-    double     lt_runav2;
+    matrix          scale_tot;
+    int             nabnsb;
+    double          s1;
+    double          s2;
+    double          ab;
+    double          lt_runav;
+    double          lt_runav2;
 } gmx_nlheur_t;
 
-void reset_nlistheuristics(gmx_nlheur_t *nlh,gmx_large_int_t step);
+void reset_nlistheuristics(gmx_nlheur_t *nlh, gmx_large_int_t step);
 
 GMX_LIBMD_EXPORT
 void init_nlistheuristics(gmx_nlheur_t *nlh,
-			  gmx_bool bGStatEveryStep,gmx_large_int_t step);
+                          gmx_bool bGStatEveryStep, gmx_large_int_t step);
 
-void update_nliststatistics(gmx_nlheur_t *nlh,gmx_large_int_t step);
+void update_nliststatistics(gmx_nlheur_t *nlh, gmx_large_int_t step);
 
 GMX_LIBMD_EXPORT
-void set_nlistheuristics(gmx_nlheur_t *nlh,gmx_bool bReset,gmx_large_int_t step);
+void set_nlistheuristics(gmx_nlheur_t *nlh, gmx_bool bReset, gmx_large_int_t step);
 
 #ifdef __cplusplus
 }

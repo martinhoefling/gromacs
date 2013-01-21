@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -53,8 +53,8 @@ extern "C" {
 #define CENTRAL (N_IVEC/2)
 #define SHIFTS  N_IVEC
 
-#define XYZ2IS(x,y,z) (N_BOX_X*(N_BOX_Y*((z)+D_BOX_Z)+(y)+D_BOX_Y)+(x)+D_BOX_X)
-#define IVEC2IS(iv)   (XYZ2IS((iv)[XX],(iv)[YY],(iv)[ZZ]))
+#define XYZ2IS(x, y, z) (N_BOX_X*(N_BOX_Y*((z)+D_BOX_Z)+(y)+D_BOX_Y)+(x)+D_BOX_X)
+#define IVEC2IS(iv)   (XYZ2IS((iv)[XX], (iv)[YY], (iv)[ZZ]))
 #define IS2X(iv)      (((iv) % N_BOX_X) - D_BOX_X)
 #define IS2Y(iv)      ((((iv) / N_BOX_X) % N_BOX_Y) - D_BOX_Y)
 #define IS2Z(iv)      ((iv) / (N_BOX_X*N_BOX_Y) - D_BOX_Z)
@@ -63,4 +63,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-

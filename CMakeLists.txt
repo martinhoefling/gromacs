@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2012, by the GROMACS development team, led by
+# Copyright (c) 2012,2013, by the GROMACS development team, led by
 # David van der Spoel, Berk Hess, Erik Lindahl, and including many
 # others, as listed in the AUTHORS file in the top-level source
 # directory and at http://www.gromacs.org.
@@ -56,7 +56,7 @@ mark_as_advanced(DART_ROOT)
 # machine with no git. 
 #
 # NOTE: when releasing the "-dev" suffix needs to be stripped off!
-set(PROJECT_VERSION "4.6-beta3-dev")
+set(PROJECT_VERSION "4.6-dev")
 set(CUSTOM_VERSION_STRING ""
     CACHE STRING "Custom version string (if empty, use hard-coded default)")
 mark_as_advanced(CUSTOM_VERSION_STRING)
@@ -230,11 +230,16 @@ if(CMAKE_CXX_COMPILER_LOADED)
     include(CheckCXXCompilerFlag)
 endif()
 
+# Get compiler version information, needs to be done early as check that depend
+# on compiler verison follow below.
+include(gmxGetCompilerInfo)
+get_compiler_version()
+
 # First exclude compilers known to not work with OpenMP although claim to support it:
 # gcc 4.2.1 and gcc-llvm 4.2.1 (also claims to be 4.2.1) on Mac OS X
 # This fixes redmine 900 and needs to run before OpenMP flags are set below.
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
-    CMAKE_COMPILER_IS_GNUCC AND C_COMPILER_VERSION VERSION_LESS 4.3)
+    (CMAKE_COMPILER_IS_GNUCC AND C_COMPILER_VERSION AND C_COMPILER_VERSION VERSION_LESS 4.3))
     message(STATUS "OpenMP multithreading not supported with gcc/llvm-gcc 4.2 on Mac OS X, disabled")
     set(GMX_OPENMP OFF CACHE BOOL
         "OpenMP multithreading not not supported with gcc/llvm-gcc 4.2 on Mac OS X, disabled!" FORCE)
@@ -270,9 +275,6 @@ endif()
 
 include(gmxCFlags)
 gmx_c_flags()
-
-include(gmxGetCompilerInfo)
-get_compiler_version()
 
 # gcc 4.4.x is buggy and crashes when compiling some files with O3 and OpenMP on.
 # Detect here whether applying a workaround is needed and will apply it later

@@ -1,7 +1,7 @@
 #
 # This file is part of the GROMACS molecular simulation package.
 #
-# Copyright (c) 2012, by the GROMACS development team, led by
+# Copyright (c) 2012,2013, by the GROMACS development team, led by
 # David van der Spoel, Berk Hess, Erik Lindahl, and including many
 # others, as listed in the AUTHORS file in the top-level source
 # directory and at http://www.gromacs.org.
@@ -48,7 +48,7 @@
 macro(get_compiler_version)
     if(NOT C_COMPILER_VERSION)
         set(_cc_dumpversion_res 0)
-        if (DEFINED xCMAKE_C_COMPILER_VERSION AND CMAKE_VERSION VERSION_GREATER 2.8.8)
+        if (DEFINED CMAKE_C_COMPILER_VERSION AND CMAKE_VERSION VERSION_GREATER 2.8.8)
             set(_cc_version ${CMAKE_C_COMPILER_VERSION})
         else()
             execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
@@ -65,9 +65,6 @@ macro(get_compiler_version)
                 CACHE STRING "C compiler version not available" FORCE)
         endif ()
     endif()
-    message("CMAKE_C_COMPILER_VERSION: ${CMAKE_C_COMPILER_VERSION}")
-    message("C_COMPILER_VERSION: ${C_COMPILER_VERSION}")
-
 
     if(NOT CXX_COMPILER_VERSION AND CMAKE_CXX_COMPILER_LOADED)
         set(_cxx_dumpversion_res 0)

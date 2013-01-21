@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -62,7 +62,7 @@ void table_spline3_fill_ewald_lr(real *table_F,
  * The force can then be interpolated linearly.
  */
 
-real ewald_spline3_table_scale(real ewaldcoeff,real rc);
+real ewald_spline3_table_scale(real ewaldcoeff, real rc);
 /* Return the scaling for the Ewald quadratic spline tables. */
 
 
@@ -70,4 +70,4 @@ real ewald_spline3_table_scale(real ewaldcoeff,real rc);
 }
 #endif
 
-#endif	/* _tables\_h */
+#endif  /* _tables\_h */

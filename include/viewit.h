@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -47,18 +47,18 @@ extern "C" {
 
 
 GMX_LIBGMX_EXPORT
-void do_view(const output_env_t oenv,const char *fn, const char *opts);
+void do_view(const output_env_t oenv, const char *fn, const char *opts);
 /* forks off appropriate command to view file.
- * currently eps, xpm, xvg and pdb are supported 
- * defaults are provided, can be overriden with environment vars 
+ * currently eps, xpm, xvg and pdb are supported
+ * defaults are provided, can be overriden with environment vars
  */
 
 GMX_LIBGMX_EXPORT
-void view_all(const output_env_t oenv,int nf, t_filenm fnm[]);
+void view_all(const output_env_t oenv, int nf, t_filenm fnm[]);
 /* calls do_view for all viewable output files in fnm[] */
- 
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _maths_h */
+#endif  /* _maths_h */

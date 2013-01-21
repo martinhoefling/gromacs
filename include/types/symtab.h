@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -44,15 +44,15 @@ extern "C" {
 #endif
 
 typedef struct symbuf {
-  int bufsize;
-  char **buf;
-  struct symbuf *next;
+    int            bufsize;
+    char         **buf;
+    struct symbuf *next;
 } t_symbuf;
 
 typedef struct
 {
-  int      nr;
-  t_symbuf *symbuf;
+    int       nr;
+    t_symbuf *symbuf;
 } t_symtab;
 
 #ifdef __cplusplus

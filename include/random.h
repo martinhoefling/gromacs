@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -56,21 +56,21 @@ real rando(int *seed);
  */
 
 GMX_LIBGMX_EXPORT
-void maxwell_speed(real tempi,int seed, 
-			  gmx_mtop_t *mtop, rvec v[]);
+void maxwell_speed(real tempi, int seed,
+                   gmx_mtop_t *mtop, rvec v[]);
 /* Generate velocites according to a maxwellian distribution */
 
-real calc_cm(FILE *log,int natoms,real mass[],rvec x[],rvec v[],
-		    rvec xcm,rvec vcm,rvec acm,matrix L);
+real calc_cm(FILE *log, int natoms, real mass[], rvec x[], rvec v[],
+             rvec xcm, rvec vcm, rvec acm, matrix L);
 /* Calculate the c.o.m. position, velocity, acceleration and the
  * moment of Inertia. Returns the total mass.
  */
 
 GMX_LIBGMX_EXPORT
-void stop_cm(FILE *log,int natoms,real mass[],rvec x[],rvec v[]);
+void stop_cm(FILE *log, int natoms, real mass[], rvec x[], rvec v[]);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _random_h */
+#endif  /* _random_h */

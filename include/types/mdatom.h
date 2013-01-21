@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -50,32 +50,32 @@ extern "C" {
 #define  DEFAULT_TF_TABLE 0
 
 typedef struct {
-  real          tmassA,tmassB,tmass;
-  int           nr;
-  int           nalloc;
-  int           nenergrp;
-  gmx_bool          bVCMgrps;
-  int           nPerturbed;
-  int           nMassPerturbed;
-  int           nChargePerturbed;
-  gmx_bool          bOrires;
-  real          *massA,*massB,*massT,*invmass;
-  real          *chargeA,*chargeB;
-  gmx_bool          *bPerturbed;
-  int           *typeA,*typeB;
-  unsigned short        *ptype;
-  unsigned short        *cTC,*cENER,*cACC,*cFREEZE,*cVCM;
-  unsigned short        *cU1,*cU2,*cORF;
-  /* for QMMM, atomnumber contains atomic number of the atoms */
-  gmx_bool          *bQM;
-  /* The range of home atoms */
-  int           start;
-  int           homenr;
-  /* The lambda value used to create the contents of the struct */
-  real          lambda;
-  /* The AdResS weighting function */
-  real          *wf;
-  unsigned short  *tf_table_index; /* The tf table that will be applied, if thermodyn, force enabled*/
+    real                   tmassA, tmassB, tmass;
+    int                    nr;
+    int                    nalloc;
+    int                    nenergrp;
+    gmx_bool               bVCMgrps;
+    int                    nPerturbed;
+    int                    nMassPerturbed;
+    int                    nChargePerturbed;
+    gmx_bool               bOrires;
+    real                  *massA, *massB, *massT, *invmass;
+    real                  *chargeA, *chargeB;
+    gmx_bool              *bPerturbed;
+    int                   *typeA, *typeB;
+    unsigned short        *ptype;
+    unsigned short        *cTC, *cENER, *cACC, *cFREEZE, *cVCM;
+    unsigned short        *cU1, *cU2, *cORF;
+    /* for QMMM, atomnumber contains atomic number of the atoms */
+    gmx_bool              *bQM;
+    /* The range of home atoms */
+    int                    start;
+    int                    homenr;
+    /* The lambda value used to create the contents of the struct */
+    real                   lambda;
+    /* The AdResS weighting function */
+    real                  *wf;
+    unsigned short        *tf_table_index; /* The tf table that will be applied, if thermodyn, force enabled*/
 } t_mdatoms;
 
 #ifdef __cplusplus

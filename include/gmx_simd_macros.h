@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2012, The GROMACS Development Team
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -243,9 +243,9 @@
 #define gmx_mul_pr        _mm256_mul_ps
 #define gmx_max_pr        _mm256_max_ps
 /* Not-equal (ordered, non-signaling)  */
-#define gmx_cmpneq_pr(x,y)  _mm256_cmp_ps(x,y,0x0c)
+#define gmx_cmpneq_pr(x, y)  _mm256_cmp_ps(x, y, 0x0c)
 /* Less-than (ordered, non-signaling)  */
-#define gmx_cmplt_pr(x,y) _mm256_cmp_ps(x,y,0x11)
+#define gmx_cmplt_pr(x, y) _mm256_cmp_ps(x, y, 0x11)
 #define gmx_and_pr        _mm256_and_ps
 #define gmx_or_pr         _mm256_or_ps
 #define gmx_andnot_pr     _mm256_andnot_ps
@@ -303,9 +303,9 @@
 #define gmx_mul_pr        _mm256_mul_pd
 #define gmx_max_pr        _mm256_max_pd
 /* Not-equal (ordered, non-signaling)  */
-#define gmx_cmpneq_pr(x,y)  _mm256_cmp_pd(x,y,0x0c)
+#define gmx_cmpneq_pr(x, y)  _mm256_cmp_pd(x, y, 0x0c)
 /* Less-than (ordered, non-signaling)  */
-#define gmx_cmplt_pr(x,y) _mm256_cmp_pd(x,y,0x11)
+#define gmx_cmplt_pr(x, y) _mm256_cmp_pd(x, y, 0x11)
 #define gmx_and_pr        _mm256_and_pd
 #define gmx_or_pr         _mm256_or_pd
 #define gmx_andnot_pr     _mm256_andnot_pd

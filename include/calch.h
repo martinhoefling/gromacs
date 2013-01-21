@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -44,11 +44,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	
+
 GMX_LIBGMX_EXPORT
 void calc_h_pos(int nht, rvec xa[], rvec xh[], int *l);
 /*
- *    w.f. van gunsteren, groningen, july 1981 
+ *    w.f. van gunsteren, groningen, july 1981
  *
  *    translated to c d. van der spoel groningen jun 1993
  *    added option 5 jan 95
@@ -63,7 +63,7 @@ void calc_h_pos(int nht, rvec xa[], rvec xh[], int *l);
  *               generated
  *    xa(1..4) : atomic positions of the control atoms i, j and k and l
  *    default bond lengths and angles are defined internally
- *   
+ *
  *    l : dynamically changed index
  */
 
@@ -71,4 +71,4 @@ void calc_h_pos(int nht, rvec xa[], rvec xh[], int *l);
 }
 #endif
 
-#endif	/* _calch_h */
+#endif  /* _calch_h */

@@ -4,7 +4,7 @@
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2004, The GROMACS development team,
  * check out http://www.gromacs.org for more information.
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013, by the GROMACS development team, led by
  * David van der Spoel, Berk Hess, Erik Lindahl, and including many
  * others, as listed in the AUTHORS file in the top-level source
  * directory and at http://www.gromacs.org.
@@ -44,8 +44,8 @@ extern "C" {
 
 GMX_LIBGMX_EXPORT
 real calc_grid(FILE *fp,
-		      matrix box,real gr_sp,
-		      int *nx,int *ny,int *nz);
+               matrix box, real gr_sp,
+               int *nx, int *ny, int *nz);
 /* Sets the number of grid points for each zero n* to the first reasonable
  * number which gives a spacing equal to or smaller than gr_sp.
  * Returns the maximum grid spacing.
