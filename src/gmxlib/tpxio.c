@@ -1382,7 +1382,7 @@ static void do_inputrec(t_fileio *fio, t_inputrec *ir, gmx_bool bRead,
     }
 
     /* Interactive molecular dynamics */
-    if (file_version >= 76) {
+    if (file_version >= 9999) {
         gmx_fio_do_int(fio,ir->bIMD);
         if (ir->bIMD == TRUE) {
             if (bRead)

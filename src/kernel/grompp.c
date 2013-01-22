@@ -1422,7 +1422,7 @@ int cmain (int argc, char *argv[])
     gmx_bool           bVerbose = FALSE;
     warninp_t          wi;
     char               warn_buf[STRLEN];
-  t_atoms      IMDatoms;
+    t_atoms      IMDatoms;
 
     t_filenm           fnm[] = {
         { efMDP, NULL,  NULL,        ffREAD  },
