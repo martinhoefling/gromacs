@@ -684,7 +684,7 @@ endif(NOT GMX_SYSTEM_XDR)
 include(gmxTestAVXMaskload)
 
 # Process nonbonded accelerated kernels settings
-string(TOUPPER ${GMX_CPU_ACCELERATION} ${GMX_CPU_ACCELERATION})
+string(TOUPPER ${GMX_CPU_ACCELERATION} GMX_CPU_ACCELERATION)
 if(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
     # nothing to do
 elseif(${GMX_CPU_ACCELERATION} STREQUAL "SSE2")
@@ -851,7 +851,7 @@ elseif(${GMX_CPU_ACCELERATION} STREQUAL "AVX_128_FMA" OR ${GMX_CPU_ACCELERATION}
     # parameter of the mask for maskload/maskstore arguments. Check if this is present, since we can work around it.
     gmx_test_avx_gcc_maskload_bug(${ACCELERATION_C_FLAGS} GMX_X86_AVX_GCC_MASKLOAD_BUG)
 
-else(${GMX_CPU_ACCELERATION} STREQUAL "IBM_QPX")
+elseif(${GMX_CPU_ACCELERATION} STREQUAL "IBM_QPX")
     # Used on BlueGene/Q
     if (CMAKE_C_COMPILER_ID MATCHES "XL")
         GMX_TEST_CFLAG(XLC_BLUEGENEQ_CFLAG "-qarch=qp -qtune=qp" ACCELERATION_C_FLAGS)
@@ -885,7 +885,7 @@ endif(${GMX_CPU_ACCELERATION} STREQUAL "NONE")
 set(ACCELERATION_QUIETLY TRUE CACHE INTERNAL "")
 
 # Process QM/MM Settings
-string(TOUPPER ${GMX_QMMM_PROGRAM} ${GMX_QMMM_PROGRAM})
+string(TOUPPER ${GMX_QMMM_PROGRAM} GMX_QMMM_PROGRAM)
 if(${GMX_QMMM_PROGRAM} STREQUAL "GAUSSIAN")
     set(GMX_QMMM_GAUSSIAN 1)
 elseif(${GMX_QMMM_PROGRAM} STREQUAL "MOPAC")
@@ -901,7 +901,7 @@ else(${GMX_QMMM_PROGRAM} STREQUAL "GAUSSIAN")
 endif(${GMX_QMMM_PROGRAM} STREQUAL "GAUSSIAN")
 
 # Process FFT library settings
-string(TOUPPER ${GMX_FFT_LIBRARY} ${GMX_FFT_LIBRARY})
+string(TOUPPER ${GMX_FFT_LIBRARY} GMX_FFT_LIBRARY)
 set(PKG_FFT "")
 set(PKG_FFT_LIBS "")
 if(${GMX_FFT_LIBRARY} STREQUAL "FFTW3")
